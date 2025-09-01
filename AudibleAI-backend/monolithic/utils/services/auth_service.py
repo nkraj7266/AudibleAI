@@ -34,14 +34,6 @@ def login_user(email, password):
     update_last_login_db(user[0])
     return {'token': token}, 200
 
-def get_jwt_user_id(request):
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    try:
-        payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
-        return payload['user_id']
-    except Exception:
-        return None
-
 def logout_user(token):
     # JWT is stateless; client should delete token
     return {'message': 'Logged out'}, 200

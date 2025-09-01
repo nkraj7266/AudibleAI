@@ -24,7 +24,7 @@ app.register_blueprint(chat_bp)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Make socketio available for services
-sys.modules['server_socketio'] = socketio
+# sys.modules['server_socketio'] = socketio
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
