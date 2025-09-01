@@ -1,5 +1,5 @@
 from flask import Blueprint
-from monolithic.utils.controllers.auth_controller import register, login, logout
+from monolithic.controllers.auth_controller import register, login, logout
 
 auth_bp = Blueprint('auth', __name__)
 

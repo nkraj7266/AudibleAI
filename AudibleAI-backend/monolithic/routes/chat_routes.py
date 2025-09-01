@@ -1,5 +1,5 @@
 from flask import Blueprint
-from monolithic.utils.controllers.chat_controller import (
+from monolithic.controllers.chat_controller import (
     get_sessions, create_session, get_messages, send_message
 )
 

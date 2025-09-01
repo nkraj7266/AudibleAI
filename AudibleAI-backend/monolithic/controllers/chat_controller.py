@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from monolithic.utils.services.chat_service import (
+from monolithic.services.chat_service import (
     list_sessions, create_new_session, list_messages, handle_user_message
 )
 from monolithic.utils.jwt_utils import get_jwt_user_id

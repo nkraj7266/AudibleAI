@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from monolithic.utils.services.auth_service import register_user, login_user, logout_user
+from monolithic.services.auth_service import register_user, login_user, logout_user
 
 def register():
     data = request.json

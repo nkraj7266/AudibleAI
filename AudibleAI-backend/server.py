@@ -4,8 +4,8 @@ from flask import Flask
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 from components.postgres.postgres_conn_utils import init_db
-from monolithic.utils.routes.auth_routes import auth_bp
-from monolithic.utils.routes.chat_routes import chat_bp
+from monolithic.routes.auth_routes import auth_bp
+from monolithic.routes.chat_routes import chat_bp
 
 load_dotenv()
 
