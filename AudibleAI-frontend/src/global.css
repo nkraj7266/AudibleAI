@@ -1,5 +1,10 @@
-body {
+* {
 	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
 	font-family: "Segoe UI", "Roboto", "Arial", sans-serif;
 	background-color: #f7f9fb;
 	color: #222;
@@ -21,11 +26,7 @@ button {
 	justify-content: center;
 }
 
-@media (max-width: 600px) {
-	body {
-		font-size: 1rem;
-		background-color: #f7f9fb;
-	}
+@media (max-width: 768px) {
 	input,
 	button {
 		font-size: 1rem;

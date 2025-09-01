@@ -1,0 +1,162 @@
+.chatScreenContainer {
+	display: flex;
+	flex-direction: row;
+	height: 100%;
+	width: 100%;
+	background: #f7f9fb;
+}
+
+.sessionList {
+	width: 220px;
+	background: #e0eafc;
+	padding: 1em 0.5em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	border-right: 1px solid #cfd8dc;
+	transition: transform 0.35s cubic-bezier(0.4, 0.2, 0.2, 1), box-shadow 0.2s;
+	z-index: 100;
+}
+
+.sessionBtn {
+	background: #fff;
+	color: #2a3b4c;
+	border: none;
+	border-radius: 0.7em;
+	padding: 0.7em 1em;
+	font-size: 1em;
+	margin-bottom: 0.2em;
+	cursor: pointer;
+	transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+	box-shadow: 0 1px 4px rgba(44, 62, 80, 0.04);
+}
+
+.activeSession {
+	background: linear-gradient(90deg, #7fa7e9 60%, #5c8edc 100%);
+	color: #fff;
+	font-weight: 700;
+	box-shadow: 0 2px 8px rgba(44, 62, 80, 0.1);
+	border: none;
+}
+
+.chatArea {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	padding: 1em;
+	height: 100%;
+	position: relative;
+}
+
+.breadcrumbBtn {
+	position: absolute;
+	top: 1em;
+	right: -3.5em;
+	background: #7fa7e9;
+	color: #fff;
+	border: none;
+	border-radius: 50%;
+	width: 2.5rem;
+	height: 2.5rem;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	cursor: pointer;
+	z-index: 200;
+}
+
+.messagesContainer {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+}
+
+.inputArea {
+	display: flex;
+	gap: 0.5em;
+	align-items: center;
+	padding: 0.5em 0;
+}
+
+.inputArea input {
+	flex: 1;
+	padding: 0.7em 1em;
+	border-radius: 0.7em;
+	border: 1px solid #cfd8dc;
+	font-size: 1em;
+	outline: none;
+}
+
+.inputArea button {
+	padding: 0.7em 1.2em;
+	background: #7fa7e9;
+	color: #fff;
+	border: none;
+	border-radius: 0.7em;
+	font-size: 1em;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.inputArea button:hover {
+	background: #5c8edc;
+}
+
+@media (max-width: 768px) {
+	.sessionList {
+		position: fixed;
+		top: 0;
+		left: 0;
+		height: 100vh;
+		width: 80vw;
+		max-width: 340px;
+		box-shadow: 2px 0 16px rgba(0, 0, 0, 0.12);
+		transform: translateX(-100%);
+		border-right: none;
+		border-bottom: 1px solid #cfd8dc;
+		padding: 2em 1em;
+		background: #e0eafc;
+		transition: transform 0.35s cubic-bezier(0.4, 0.2, 0.2, 1),
+			box-shadow 0.2s;
+		z-index: 100;
+		flex-direction: column;
+		gap: 0.7em;
+		border-radius: 0 1.5em 1.5em 0;
+	}
+	.sessionList.open {
+		transform: translateX(0);
+		box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+	}
+	.sessionBtn,
+	.activeSession {
+		font-size: 1.08em;
+		padding: 1em 1.2em;
+		margin-bottom: 0.3em;
+		border-radius: 1em;
+	}
+	.chatArea {
+		padding: 0.5em 0.5em 0 0.5em;
+		height: 100vh;
+		position: relative;
+	}
+}
+
+@media (max-width: 480px) {
+	.sessionList {
+		height: 100vh;
+		padding: 1em;
+		border-radius: 0 1em 1em 0;
+	}
+	.chatArea {
+		padding: 0.25em 0.35em 0 0.35em;
+	}
+	.inputArea input {
+		font-size: 0.95em;
+		padding: 0.5em 0.7em;
+	}
+	.inputArea button {
+		font-size: 0.95em;
+		padding: 0.5em 0.8em;
+	}
+}
