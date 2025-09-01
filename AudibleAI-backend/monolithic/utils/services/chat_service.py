@@ -1,3 +1,4 @@
+import sys
 from components.postgres.chat_queries import (
     get_sessions_db,
     create_session_db,
@@ -5,7 +6,7 @@ from components.postgres.chat_queries import (
     add_user_message_db,
     add_ai_message_db
 )
-from server import socketio
+socketio = sys.modules.get('server_socketio')
 from components.llm_models.gemini_flash import get_gemini_response
 
 def list_sessions(user_id):
