@@ -14,9 +14,16 @@ def register_user(email, password):
         return {'error': 'Email already registered'}, 409
     password_hash = generate_password_hash(password)
     cur.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id", (email, password_hash))
-    db.commit()
     user_id = cur.fetchone()[0]
-    return {'message': 'User registered successfully', 'user_id': user_id}, 201
+    db.commit()
+    # Immediately log in the user after registration
+    token = jwt.encode({
+        'user_id': user_id,
+        'exp': (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)).timestamp()
+    }, current_app.config['SECRET_KEY'], algorithm='HS256')
+    cur.execute("UPDATE users SET last_login_at=NOW() WHERE id=%s", (user_id,))
+    db.commit()
+    return {'message': 'User registered and logged in successfully', 'token': token, 'user_id': user_id}, 201
 
 def login_user(email, password):
     db = get_db()
@@ -27,7 +34,7 @@ def login_user(email, password):
         return {'error': 'Invalid credentials'}, 401
     token = jwt.encode({
         'user_id': user[0],
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        'exp': (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)).timestamp()
     }, current_app.config['SECRET_KEY'], algorithm='HS256')
     cur.execute("UPDATE users SET last_login_at=NOW() WHERE id=%s", (user[0],))
     db.commit()
