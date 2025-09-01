@@ -1,0 +1,86 @@
+.loginContainer {
+	width: 100vw;
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+}
+
+.form {
+	background: #fff;
+	padding: 2rem 1.5rem;
+	border-radius: 1.25rem;
+	box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	width: 100%;
+	max-width: 350px;
+	margin: 0 15px;
+}
+
+.form h2 {
+	margin: 0 0 0.5rem 0;
+	font-size: 2rem;
+	text-align: center;
+	color: #2a3b4c;
+}
+
+.form input {
+	padding: 0.75em 1em;
+	border: 1px solid #cfd8dc;
+	border-radius: 0.75em;
+	font-size: 1rem;
+	outline: none;
+	transition: border 0.2s;
+}
+
+.form input:focus {
+	border-color: #7fa7e9;
+}
+
+.form button {
+	padding: 0.75em 1em;
+	background: #7fa7e9;
+	color: #fff;
+	border: none;
+	border-radius: 0.75em;
+	font-size: 1rem;
+	font-weight: 600;
+	transition: background 0.2s;
+}
+
+.form button:disabled {
+	background: #b3c7e6;
+}
+
+.error {
+	color: #d32f2f;
+	font-size: 0.95rem;
+	text-align: center;
+}
+
+.switchText {
+	text-align: center;
+	font-size: 0.95rem;
+	color: #2a3b4c;
+}
+
+.switchText span {
+	color: #7fa7e9;
+	cursor: pointer;
+	font-weight: 600;
+	margin-left: 0.25em;
+}
+
+@media (max-width: 600px) {
+	.form {
+		padding: 1.25rem 0.75rem;
+		max-width: 95vw;
+		border-radius: 0.75rem;
+	}
+	.form h2 {
+		font-size: 1.5rem;
+	}
+}
