@@ -6,6 +6,7 @@ from components.postgres.chat_queries import (
     add_ai_message_db
 )
 from server import socketio
+from components.llm_models.gemini_flash import get_gemini_response
 
 def list_sessions(user_id):
     return get_sessions_db(user_id)
@@ -25,7 +26,3 @@ def handle_user_message(session_id, user_id, text):
         'message': {'id': ai_msg_id, 'sender': 'AI', 'text': ai_text}
     }, room=str(user_id))
     return {'user_msg_id': msg_id, 'ai_msg_id': ai_msg_id, 'ai_text': ai_text}
-
-def get_gemini_response(text):
-    # Replace with actual Gemini API call
-    return f"Gemini response to: {text}"
