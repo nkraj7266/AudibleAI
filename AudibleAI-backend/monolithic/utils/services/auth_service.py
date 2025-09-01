@@ -1,7 +1,7 @@
 import datetime
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask import current_app
+from flask import current_app, request
 from components.postgres.postgres_conn_utils import get_db
 
 def register_user(email, password):
@@ -39,3 +39,15 @@ def login_user(email, password):
     cur.execute("UPDATE users SET last_login_at=NOW() WHERE id=%s", (user[0],))
     db.commit()
     return {'token': token}, 200
+
+def get_jwt_user_id(request):
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload['user_id']
+    except Exception:
+        return None
+
+def logout_user(token):
+    # JWT is stateless; client should delete token
+    return {'message': 'Logged out'}, 200
