@@ -2,6 +2,7 @@ import os
 import sys
 from flask import Flask
 from flask_socketio import SocketIO
+from flask_cors import CORS
 from dotenv import load_dotenv
 from components.postgres.postgres_conn_utils import init_db
 from monolithic.routes.auth_routes import auth_bp
@@ -10,6 +11,7 @@ from monolithic.routes.chat_routes import chat_bp
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET')
 app.config['DATABASE_URL'] = os.getenv('DATABASE_URL')
 
