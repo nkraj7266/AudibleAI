@@ -1,10 +1,4 @@
-import React, {
-	useState,
-	useEffect,
-	useRef,
-	useCallback,
-	useMemo,
-} from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
 	getDemoSessions,
 	getDemoMessages,
@@ -12,8 +6,6 @@ import {
 } from "../../demo/demoApi";
 import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
-// import { FaBars } from "react-icons/fa";
-import Bars from "../../components/Bars";
 import styles from "./ChatScreen.module.css";
 
 const ChatScreen = () => {
@@ -23,7 +15,7 @@ const ChatScreen = () => {
 	const [input, setInput] = useState("");
 	const [isTyping, setIsTyping] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
-	const sessionListRef = useRef(null);
+	const sideBarRef = useRef(null);
 
 	useEffect(() => {
 		getDemoSessions().then(setSessions);
@@ -46,7 +38,7 @@ const ChatScreen = () => {
 	const sessionButtons = useMemo(
 		() =>
 			sessions.map((s) => (
-				<button
+				<div
 					key={s.id}
 					className={
 						selectedSession === s.id
@@ -56,7 +48,7 @@ const ChatScreen = () => {
 					onClick={() => handleSessionSelect(s.id)}
 				>
 					{s.title}
-				</button>
+				</div>
 			)),
 		[sessions, selectedSession, handleSessionSelect]
 	);
@@ -89,8 +81,8 @@ const ChatScreen = () => {
 		if (!sidebarOpen) return;
 		const handleClick = (e) => {
 			if (
-				sessionListRef.current &&
-				!sessionListRef.current.contains(e.target) &&
+				sideBarRef.current &&
+				!sideBarRef.current.contains(e.target) &&
 				!e.target.classList.contains(styles.breadcrumbBtn)
 			) {
 				setSidebarOpen(false);
@@ -103,12 +95,21 @@ const ChatScreen = () => {
 	return (
 		<div className={styles.chatScreenContainer}>
 			<div
-				ref={sessionListRef}
+				ref={sideBarRef}
 				className={
-					styles.sessionList + (sidebarOpen ? " " + styles.open : "")
+					styles.sideBar + (sidebarOpen ? " " + styles.open : "")
 				}
 			>
-				{sessionButtons}
+				<div className={styles.newChatBtn}>
+					<i className="ri-chat-new-line"></i>
+					<p>New Chat</p>
+				</div>
+				<div className={styles.sessionsList}>
+					<div className={styles.sessionsHead}>
+						<p>Chats</p>
+					</div>
+					{sessionButtons}
+				</div>
 				<button
 					className={`${styles.breadcrumbBtn} center`}
 					onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -121,18 +122,16 @@ const ChatScreen = () => {
 					{messageBubbles}
 					{isTyping && <TypingIndicator />}
 				</div>
-				{selectedSession && (
-					<div className={styles.inputArea}>
-						<input
-							type="text"
-							value={input}
-							onChange={(e) => setInput(e.target.value)}
-							placeholder="Type your message..."
-							onKeyDown={(e) => e.key === "Enter" && handleSend()}
-						/>
-						<button onClick={handleSend}>Send</button>
-					</div>
-				)}
+				<div className={styles.inputArea}>
+					<input
+						type="text"
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						placeholder="Type your message..."
+						onKeyDown={(e) => e.key === "Enter" && handleSend()}
+					/>
+					<button onClick={handleSend}>Send</button>
+				</div>
 			</div>
 		</div>
 	);
