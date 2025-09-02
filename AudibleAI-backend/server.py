@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from components.postgres.postgres_conn_utils import init_db
 from monolithic.routes.auth_routes import auth_bp
 from monolithic.routes.chat_routes import chat_bp
+from monolithic.socket.events import register_socket_events
 
 load_dotenv()
 
@@ -24,17 +25,10 @@ app.register_blueprint(chat_bp)
 
 # SocketIO setup
 socketio = SocketIO(app, cors_allowed_origins="*")
+sys.modules['server_socketio'] = socketio # Make socketio available for services
 
-# Make socketio available for services
-sys.modules['server_socketio'] = socketio
-
-# SocketIO event: join room
-@socketio.on('join')
-def on_join(data):
-    user_id = data.get('user_id')
-    if user_id:
-        from flask_socketio import join_room
-        join_room(str(user_id))
+# Register socket events
+register_socket_events(socketio)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=os.getenv('PORT', 5000))
