@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Register.module.css";
+import { registerUser } from "../../api/auth";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -16,14 +17,10 @@ const Register = ({ setJwt }) => {
 		setLoading(true);
 		setError("");
 		try {
-			const res = await fetch(`${API_URL}/auth/register`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email, password }),
-			});
-			const data = await res.json();
-			if (res.ok && data.token) {
+			const data = await registerUser(email, password);
+			if (data.ok && data.token) {
 				localStorage.setItem("jwt", data.token);
+				setJwt && setJwt(data.token);
 				navigate("/chat");
 			} else {
 				setError(data.error || "Registration failed");
