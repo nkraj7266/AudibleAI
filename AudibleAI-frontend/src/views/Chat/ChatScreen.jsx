@@ -98,9 +98,19 @@ const ChatScreen = ({ jwt }) => {
 			});
 		});
 
+		// Listen for session title update
+		socket.on("session:title:update", (data) => {
+			setSessions((prevSessions) =>
+				prevSessions.map((s) =>
+					s.id === data.session_id ? { ...s, title: data.title } : s
+				)
+			);
+		});
+
 		return () => {
 			socket.off("ai:response:chunk");
 			socket.off("ai:response:end");
+			socket.off("session:title:update");
 		};
 	}, [jwt, selectedSession]);
 
@@ -194,6 +204,7 @@ const ChatScreen = ({ jwt }) => {
 					session_id: sessionId,
 					user_id,
 					text: input,
+					is_first_message: true,
 				});
 				setMessages([{ id: Date.now(), sender: "USER", text: input }]);
 				setInput("");
@@ -207,6 +218,7 @@ const ChatScreen = ({ jwt }) => {
 				session_id: sessionId,
 				user_id,
 				text: input,
+				is_first_message: messages.length === 0,
 			});
 			setMessages((msgs) => [
 				...msgs,

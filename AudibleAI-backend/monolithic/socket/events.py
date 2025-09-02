@@ -14,7 +14,8 @@ def register_socket_events(socketio):
         session_id = data.get('session_id')
         user_id = data.get('user_id')
         text = data.get('text')
+        is_first_message = data.get('is_first_message', False)
         if session_id and user_id and text:
-            result = handle_user_message(session_id, user_id, text)
+            result = handle_user_message(session_id, user_id, text, is_first_message=is_first_message)
             emit_stream_chunks(socketio, user_id, session_id, result['ai_text_chunks'], delay=0.5)
             emit_response_end(socketio, user_id, session_id, result['ai_msg_id'], result['ai_text'])
