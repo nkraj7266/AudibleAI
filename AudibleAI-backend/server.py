@@ -1,13 +1,37 @@
 import os
 import sys
+from logging_config import app_logger, error_logger
 from flask import Flask
-from flask_socketio import SocketIO
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from dotenv import load_dotenv
 from components.postgres.postgres_conn_utils import init_db
 from monolithic.routes.auth_routes import auth_bp
 from monolithic.routes.chat_routes import chat_bp
 from monolithic.socket.events import register_socket_events
+
+def log_exception(sender, exception, **extra):
+    app_logger.error(f"Exception: {exception}", exc_info=True)
+    error_logger.error(f"Exception: {exception}", exc_info=True)
+
+def log_request(sender, **extra):
+    app_logger.info(f"Request: {extra}")
+
+def log_message(msg):
+    app_logger.info(msg)
+
+def log_error(msg):
+    error_logger.error(msg)
+
+def log_info(msg):
+    app_logger.info(msg)
+
+def log_warning(msg):
+    app_logger.warning(msg)
+
+def log_debug(msg):
+    app_logger.debug(msg)
+
 
 load_dotenv()
 
@@ -30,5 +54,13 @@ sys.modules['server_socketio'] = socketio # Make socketio available for services
 # Register socket events
 register_socket_events(socketio)
 
+# Flask error handler
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app_logger.error(f"Exception: {e}", exc_info=True)
+    error_logger.error(f"Exception: {e}", exc_info=True)
+    return {"error": str(e)}, 500
+
 if __name__ == '__main__':
+    app_logger.info("Starting Flask server...")
     socketio.run(app, host='0.0.0.0', port=os.getenv('PORT', 5000))
