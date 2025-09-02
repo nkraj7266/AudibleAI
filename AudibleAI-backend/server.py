@@ -10,29 +10,6 @@ from monolithic.routes.auth_routes import auth_bp
 from monolithic.routes.chat_routes import chat_bp
 from monolithic.socket.events import register_socket_events
 
-def log_exception(sender, exception, **extra):
-    app_logger.error(f"Exception: {exception}", exc_info=True)
-    error_logger.error(f"Exception: {exception}", exc_info=True)
-
-def log_request(sender, **extra):
-    app_logger.info(f"Request: {extra}")
-
-def log_message(msg):
-    app_logger.info(msg)
-
-def log_error(msg):
-    error_logger.error(msg)
-
-def log_info(msg):
-    app_logger.info(msg)
-
-def log_warning(msg):
-    app_logger.warning(msg)
-
-def log_debug(msg):
-    app_logger.debug(msg)
-
-
 load_dotenv()
 
 app = Flask(__name__)

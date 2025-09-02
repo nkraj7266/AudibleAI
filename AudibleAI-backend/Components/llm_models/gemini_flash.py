@@ -21,12 +21,12 @@ def get_gemini_response(user_message):
         ]
     }
     try:
-        app_logger.info(f"Gemini API request: {user_message}")
+        app_logger.info(f"Gemini API user message recieved")
         response = requests.post(endpoint, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
         ai_text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-        app_logger.info(f"Gemini API response: {ai_text}")
+        app_logger.info(f"Gemini API response generated")
         return ai_text
     except Exception as e:
         error_logger.error(f"Gemini API Error: {e}", exc_info=True)
