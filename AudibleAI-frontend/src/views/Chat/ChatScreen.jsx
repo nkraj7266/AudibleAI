@@ -23,6 +23,7 @@ const ChatScreen = ({ jwt }) => {
 	const sideBarRef = useRef(null);
 	const socketRef = useRef(null);
 	const aiStreamingRef = useRef("");
+	const messagesEndRef = useRef(null);
 	const [aiStreamingText, setAiStreamingText] = useState("");
 	// Socket connection setup
 	useEffect(() => {
@@ -243,6 +244,12 @@ const ChatScreen = ({ jwt }) => {
 		return () => document.removeEventListener("mousedown", handleClick);
 	}, [sidebarOpen]);
 
+	useEffect(() => {
+		if (messagesEndRef.current) {
+			messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+		}
+	}, [messages]);
+
 	return (
 		<div className={styles.chatScreenContainer}>
 			<div
@@ -272,6 +279,7 @@ const ChatScreen = ({ jwt }) => {
 				<div className={styles.messagesContainer}>
 					{messageBubbles}
 					{isTyping && <TypingIndicator />}
+					<div ref={messagesEndRef} />
 				</div>
 				<div className={styles.inputArea}>
 					<input
