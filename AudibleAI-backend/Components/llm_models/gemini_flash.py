@@ -18,7 +18,7 @@ def get_gemini_response(user_message):
         ]
     }
     try:
-        response = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+        response = requests.post(endpoint, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
         ai_text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
