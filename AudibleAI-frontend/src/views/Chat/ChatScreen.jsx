@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { io } from "socket.io-client";
 import {
 	getSessions,
 	getMessages,
@@ -9,6 +10,8 @@ import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
 import styles from "./ChatScreen.module.css";
 
+const SOCKET_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const ChatScreen = ({ jwt }) => {
 	const [sessions, setSessions] = useState([]);
 	const [selectedSession, setSelectedSession] = useState(null);
@@ -17,6 +20,89 @@ const ChatScreen = ({ jwt }) => {
 	const [isTyping, setIsTyping] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const sideBarRef = useRef(null);
+	const socketRef = useRef(null);
+	const aiStreamingRef = useRef("");
+	const [aiStreamingText, setAiStreamingText] = useState("");
+	// Socket connection setup
+	useEffect(() => {
+		if (!jwt) return;
+		if (!socketRef.current) {
+			socketRef.current = io(SOCKET_URL, {
+				auth: { token: jwt },
+				transports: ["websocket"],
+			});
+			// Emit join event with user_id (from JWT)
+			try {
+				const payload = JSON.parse(atob(jwt.split(".")[1]));
+				const user_id = payload.user_id || payload.sub || payload.id;
+				if (user_id) {
+					socketRef.current.emit("join", { user_id });
+				}
+			} catch {}
+		}
+		const socket = socketRef.current;
+
+		// Listen for AI response chunks
+		socket.on("ai:response:chunk", (data) => {
+			if (data.session_id !== selectedSession) return;
+			setIsTyping(true);
+			aiStreamingRef.current += data.chunk;
+			setAiStreamingText(aiStreamingRef.current);
+			// Show partial AI message
+			setMessages((msgs) => {
+				// If last message is AI and streaming, update it
+				if (
+					msgs.length &&
+					msgs[msgs.length - 1].sender === "AI" &&
+					msgs[msgs.length - 1].streaming
+				) {
+					const updated = [...msgs];
+					updated[updated.length - 1].text = aiStreamingRef.current;
+					return updated;
+				}
+				// Otherwise, add new streaming AI message
+				return [
+					...msgs,
+					{
+						id: Date.now(),
+						sender: "AI",
+						text: aiStreamingRef.current,
+						streaming: true,
+					},
+				];
+			});
+		});
+
+		// Listen for AI response end
+		socket.on("ai:response:end", (data) => {
+			if (data.session_id !== selectedSession) return;
+			setIsTyping(false);
+			aiStreamingRef.current = "";
+			setAiStreamingText("");
+			setMessages((msgs) => {
+				// Replace last streaming AI message with final
+				if (
+					msgs.length &&
+					msgs[msgs.length - 1].sender === "AI" &&
+					msgs[msgs.length - 1].streaming
+				) {
+					const updated = [...msgs];
+					updated[updated.length - 1] = {
+						...data.message,
+						streaming: false,
+					};
+					return updated;
+				}
+				// Otherwise, add final AI message
+				return [...msgs, { ...data.message, streaming: false }];
+			});
+		});
+
+		return () => {
+			socket.off("ai:response:chunk");
+			socket.off("ai:response:end");
+		};
+	}, [jwt, selectedSession]);
 
 	useEffect(() => {
 		if (!jwt) return;
@@ -68,42 +154,54 @@ const ChatScreen = ({ jwt }) => {
 
 	const messageBubbles = useMemo(
 		() =>
-			messages.map((msg) => <MessageBubble key={msg.id} message={msg} />),
-		[messages]
+			messages.map((msg, idx) => {
+				// If last message is AI and streaming, use aiStreamingText
+				if (
+					msg.sender === "AI" &&
+					msg.streaming &&
+					idx === messages.length - 1
+				) {
+					return (
+						<MessageBubble
+							key={msg.id}
+							message={{ ...msg, text: aiStreamingText }}
+						/>
+					);
+				}
+				return <MessageBubble key={msg.id} message={msg} />;
+			}),
+		[messages, aiStreamingText]
 	);
 
 	const handleSend = useCallback(async () => {
 		if (!input.trim() || !jwt) return;
 		setIsTyping(true);
+		let sessionId = selectedSession;
 		// If starting a new chat
 		if (!selectedSession && messages.length === 0) {
 			try {
 				const res = await createSession(jwt, "New Chat");
-				const newSessionId = res.session_id;
-				setSelectedSession(newSessionId);
+				sessionId = res.session_id;
+				setSelectedSession(sessionId);
 				setSessions((prev) => [
 					...prev,
-					{ id: newSessionId, title: "New Chat" },
+					{ id: sessionId, title: "New Chat" },
 				]);
-				await sendMessage(newSessionId, input, jwt);
+				await sendMessage(sessionId, input, jwt);
 				setMessages([{ id: Date.now(), sender: "USER", text: input }]);
 				setInput("");
-				// AI response will be handled via socket streaming in next step
 			} catch (err) {
 				setIsTyping(false);
 			}
-			return;
+		} else if (selectedSession) {
+			await sendMessage(sessionId, input, jwt);
+			setMessages((msgs) => [
+				...msgs,
+				{ id: Date.now(), sender: "USER", text: input },
+			]);
+			setInput("");
 		}
-		// ...existing code for sending message...
-		if (!selectedSession) return;
-		await sendMessage(selectedSession, input, jwt);
-		setMessages((msgs) => [
-			...msgs,
-			{ id: Date.now(), sender: "USER", text: input },
-		]);
-		setInput("");
-		// AI response will be handled via socket streaming in next step
-	}, [input, selectedSession, messages.length, jwt]);
+	}, [input, selectedSession, messages.length, jwt, isTyping]);
 
 	useEffect(() => {
 		if (!sidebarOpen) return;
