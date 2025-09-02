@@ -36,7 +36,7 @@ const ChatScreen = ({ jwt }) => {
 				const payload = JSON.parse(atob(jwt.split(".")[1]));
 				const user_id = payload.user_id || payload.sub || payload.id;
 				if (user_id) {
-					socketRef.current.emit("join", { user_id });
+					socketRef.current.emit("user:join", { user_id });
 				}
 			} catch {}
 		}
@@ -177,6 +177,7 @@ const ChatScreen = ({ jwt }) => {
 		if (!input.trim() || !jwt) return;
 		setIsTyping(true);
 		let sessionId = selectedSession;
+		const socket = socketRef.current;
 		// If starting a new chat
 		if (!selectedSession && messages.length === 0) {
 			try {
@@ -187,14 +188,28 @@ const ChatScreen = ({ jwt }) => {
 					...prev,
 					{ id: sessionId, title: "New Chat" },
 				]);
-				await sendMessage(sessionId, input, jwt);
+				// Send user message via socket
+				const payload = JSON.parse(atob(jwt.split(".")[1]));
+				const user_id = payload.user_id || payload.sub || payload.id;
+				socket.emit("user:message", {
+					session_id: sessionId,
+					user_id,
+					text: input,
+				});
 				setMessages([{ id: Date.now(), sender: "USER", text: input }]);
 				setInput("");
 			} catch (err) {
 				setIsTyping(false);
 			}
 		} else if (selectedSession) {
-			await sendMessage(sessionId, input, jwt);
+			// Send user message via socket
+			const payload = JSON.parse(atob(jwt.split(".")[1]));
+			const user_id = payload.user_id || payload.sub || payload.id;
+			socket.emit("user:message", {
+				session_id: sessionId,
+				user_id,
+				text: input,
+			});
 			setMessages((msgs) => [
 				...msgs,
 				{ id: Date.now(), sender: "USER", text: input },
