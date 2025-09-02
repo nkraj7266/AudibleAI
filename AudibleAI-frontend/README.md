@@ -1,70 +1,131 @@
-# Getting Started with Create React App
+# AudibleAI Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+AudibleAI is a modern web application for real-time chat powered by advanced AI models. The frontend is built with React, providing a fast, responsive, and user-friendly interface for interacting with the backend AI services.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+-   Real-time chat with AI responses
+-   Auto-scrolling chat window for new messages
+-   Beautiful, minimal UI with custom thin scrollbars
+-   Modular component structure for maintainability
+-   Responsive design for desktop and mobile
+-   Error handling and loading indicators
+-   Easy integration with backend via REST and Socket.io
 
-### `npm start`
+## Project Structure
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
+AudibleAI-frontend/
+├── public/
+│   ├── icons/
+│   └── index.html
+├── src/
+│   ├── api/                   # API utilities
+│   ├── components/            # Reusable UI components
+│   │   └── MessageBubble.jsx
+│   │   └── MessageBubble.module.css
+│   │   └── TypingIndicator.jsx
+│   │   └── TypingIndicator.module.css
+│   ├── hooks/                 # Reusable Custom hooks
+│   │   └── useChatMessages.js
+│   │   └── useSessionManager.js
+│   │   └── useSocket.js
+│   ├── utils/                 # Utility files
+│   │   └── jwt.js
+│   │   └── socket.js
+│   ├── views/                 # Main app views
+│   │   ├── Auth/              # Auth screen and related files
+│   │   |   └── Login.jsx
+│   │   |   └── Login.module.css
+│   │   |   └── Register.jsx
+│   │   |   └── Register.module.css
+│   │   ├── Chat/              # Chat screen and related files
+│   │   |   └── ChatScreen.jsx
+│   │   |   └── ChatScreen.module.css
+│   │   └── Home/              # Home screen and related files
+│   │       └── Home.jsx
+│   │       └── Home.module.css
+│   ├── App.jsx                # Main app component
+│   ├── App.module.css         # Main app component styles
+│   ├── global.css             # Global styles (scrollbar, resets, etc.)
+│   └── index.js               # Entry point
+├── .env.example               # Example environment variables
+├── package.json
+└── README.md
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Getting Started
 
-### `npm test`
+### Prerequisites
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+-   Node.js (v18+ recommended)
+-   npm (comes with Node.js)
 
-### `npm run build`
+### Installation
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Clone the repository:
+    ```sh
+    git clone <repo-url>
+    cd AudibleAI-frontend
+    ```
+2. Install dependencies:
+    ```sh
+    npm install
+    ```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Running the App
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Start the development server:
 
-### `npm run eject`
+```sh
+npm start
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+-   The app will be available at `http://localhost:3000`.
+-   The development build supports hot-reloading for fast iteration.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Building for Production
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```sh
+npm run build
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+-   This creates an optimized build in the `build/` directory.
 
-## Learn More
+## Key Components
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+-   **ChatScreen.jsx**: Main chat interface, handles message rendering, auto-scroll, and user input.
+-   **MessageBubble.jsx**: Displays individual chat messages with styling.
+-   **global.css**: Global styles including custom scrollbar.
+-   **api/**: Contains functions for communicating with the backend (REST/WebSocket).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Customization
 
-### Code Splitting
+-   Modify styles in `global.css` and component `.module.css` files.
+-   Add new components in `src/components/` as needed.
+-   Update API endpoints in `src/api/` to match your backend configuration.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Best Practices
 
-### Analyzing the Bundle Size
+-   Use functional components and React hooks for state management.
+-   Keep components small and focused.
+-   Use CSS modules for scoped styles.
+-   Handle errors gracefully and provide user feedback.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Troubleshooting
 
-### Making a Progressive Web App
+-   If you see CORS errors, ensure the backend allows requests from the frontend origin.
+-   For API issues, check the backend server logs and network tab in browser dev tools.
+-   For styling issues, verify your CSS selectors and module imports.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Contributing
 
-### Advanced Configuration
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -am 'Add new feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Open a pull request
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## License
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+MIT
