@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
+import { getJwtUserId } from "../../utils/jwt";
 import {
 	getSessions,
 	getMessages,
@@ -33,8 +34,7 @@ const ChatScreen = ({ jwt }) => {
 			});
 			// Emit join event with user_id (from JWT)
 			try {
-				const payload = JSON.parse(atob(jwt.split(".")[1]));
-				const user_id = payload.user_id || payload.sub || payload.id;
+				const user_id = getJwtUserId(jwt);
 				if (user_id) {
 					socketRef.current.emit("user:join", { user_id });
 				}
@@ -189,8 +189,7 @@ const ChatScreen = ({ jwt }) => {
 					{ id: sessionId, title: "New Chat" },
 				]);
 				// Send user message via socket
-				const payload = JSON.parse(atob(jwt.split(".")[1]));
-				const user_id = payload.user_id || payload.sub || payload.id;
+				const user_id = getJwtUserId(jwt);
 				socket.emit("user:message", {
 					session_id: sessionId,
 					user_id,
@@ -203,8 +202,7 @@ const ChatScreen = ({ jwt }) => {
 			}
 		} else if (selectedSession) {
 			// Send user message via socket
-			const payload = JSON.parse(atob(jwt.split(".")[1]));
-			const user_id = payload.user_id || payload.sub || payload.id;
+			const user_id = getJwtUserId(jwt);
 			socket.emit("user:message", {
 				session_id: sessionId,
 				user_id,
