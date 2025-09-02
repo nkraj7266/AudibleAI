@@ -22,7 +22,7 @@ def handle_user_message(session_id, user_id, text):
     msg_id = add_user_message_db(session_id, text)
     ai_text = get_gemini_response(text)
     ai_msg_id = add_ai_message_db(session_id, ai_text)
-    socketio.emit('chat:ai_response', {
+    socketio.emit('ai:response', {
         'session_id': session_id,
         'message': {'id': ai_msg_id, 'sender': 'AI', 'text': ai_text}
     }, room=str(user_id))

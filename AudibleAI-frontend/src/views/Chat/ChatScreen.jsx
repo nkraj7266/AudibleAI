@@ -78,12 +78,12 @@ const ChatScreen = ({ jwt }) => {
 		// If starting a new chat
 		if (!selectedSession && messages.length === 0) {
 			try {
-				const res = await createSession(jwt, "New chat");
+				const res = await createSession(jwt, "New Chat");
 				const newSessionId = res.session_id;
 				setSelectedSession(newSessionId);
 				setSessions((prev) => [
 					...prev,
-					{ id: newSessionId, title: "New chat" },
+					{ id: newSessionId, title: "New Chat" },
 				]);
 				await sendMessage(newSessionId, input, jwt);
 				setMessages([{ id: Date.now(), sender: "USER", text: input }]);

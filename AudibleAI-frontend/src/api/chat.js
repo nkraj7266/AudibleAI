@@ -29,7 +29,7 @@ export async function sendMessage(sessionId, text, jwt) {
 	return res.json();
 }
 
-export async function createSession(jwt, title = "New chat") {
+export async function createSession(jwt, title = "New Chat") {
 	const res = await fetch(`${API_URL}/sessions`, {
 		method: "POST",
 		headers: {
