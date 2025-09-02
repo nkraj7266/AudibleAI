@@ -3,7 +3,9 @@ from components.postgres.chat_queries import (
     create_session_db,
     get_messages_db,
     add_user_message_db,
-    add_ai_message_db
+    add_ai_message_db,
+    delete_session_db,
+    update_session_title_db
 )
 from components.llm_models.gemini_flash import get_gemini_response_stream
 
@@ -27,3 +29,9 @@ def handle_user_message(session_id, user_id, text):
         'ai_text': ai_text,
         'ai_text_chunks': ai_text_chunks
     }
+
+def delete_session(session_id, user_id):
+    return delete_session_db(session_id, user_id)
+
+def update_session_title(session_id, user_id, new_title):
+    return update_session_title_db(session_id, user_id, new_title)

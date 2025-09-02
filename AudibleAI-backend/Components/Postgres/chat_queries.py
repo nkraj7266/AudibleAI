@@ -36,3 +36,19 @@ def add_ai_message_db(session_id, ai_text):
     cur.execute("INSERT INTO messages (id, session_id, sender, text) VALUES (%s, %s, %s, %s)", (ai_msg_id, session_id, 'AI', ai_text))
     db.commit()
     return ai_msg_id
+
+def delete_session_db(session_id, user_id):
+    db = get_db()
+    cur = db.cursor()
+    # Only allow user to delete their own session
+    cur.execute("DELETE FROM chatsessions WHERE id=%s AND user_id=%s", (session_id, user_id))
+    db.commit()
+    return cur.rowcount > 0
+
+def update_session_title_db(session_id, user_id, new_title):
+    db = get_db()
+    cur = db.cursor()
+    # Only allow user to update their own session
+    cur.execute("UPDATE chatsessions SET title=%s WHERE id=%s AND user_id=%s", (new_title, session_id, user_id))
+    db.commit()
+    return cur.rowcount > 0
