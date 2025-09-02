@@ -275,21 +275,23 @@ const ChatScreen = ({ jwt }) => {
 					<i className="ri-side-bar-line"></i>
 				</button>
 			</div>
-			<div className={styles.chatArea}>
-				<div className={styles.messagesContainer}>
-					{messageBubbles}
-					{isTyping && <TypingIndicator />}
-					<div ref={messagesEndRef} />
-				</div>
-				<div className={styles.inputArea}>
-					<input
-						type="text"
-						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						placeholder="Type your message..."
-						onKeyDown={(e) => e.key === "Enter" && handleSend()}
-					/>
-					<button onClick={handleSend}>Send</button>
+			<div className={styles.chatAreaBox}>
+				<div className={styles.chatArea}>
+					<div className={styles.messagesContainer}>
+						{messageBubbles}
+						{isTyping && <TypingIndicator />}
+						<div ref={messagesEndRef} />
+					</div>
+					<div className={styles.inputArea}>
+						<input
+							type="text"
+							value={input}
+							onChange={(e) => setInput(e.target.value)}
+							placeholder="Type your message..."
+							onKeyDown={(e) => e.key === "Enter" && handleSend()}
+						/>
+						<button onClick={handleSend}>Send</button>
+					</div>
 				</div>
 			</div>
 		</div>

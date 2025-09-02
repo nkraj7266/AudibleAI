@@ -76,14 +76,20 @@
 	padding: 0.5em 0.8em;
 }
 
+.chatAreaBox {
+	flex: 1;
+	background-color: #ffeed1;
+}
+
 .chatArea {
 	flex: 1;
 	display: flex;
+	max-width: 768px;
+	margin: 0 auto;
 	flex-direction: column;
-	padding: 0.5em;
+	padding: 1em;
 	height: 100%;
 	position: relative;
-	background-color: #ffeed1;
 }
 
 .breadcrumbBtn {
@@ -186,7 +192,7 @@
 		border-radius: 0 1em 1em 0;
 	}
 	.chatArea {
-		padding: 0.25em 0.35em 0 0.35em;
+		padding: 0.25em 0.5em 0 0.5em;
 	}
 	.inputArea input {
 		font-size: 0.95em;
