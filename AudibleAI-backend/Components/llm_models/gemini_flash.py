@@ -1,6 +1,7 @@
 import os
 import requests
 
+
 def get_gemini_response(user_message):
     """
     Sends a chat message to Gemini 2.5 Flash API and returns the AI response text.
@@ -20,8 +21,15 @@ def get_gemini_response(user_message):
         response = requests.post(endpoint, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
-        # Extract the AI response text (adjust key as per actual API response)
         ai_text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
         return ai_text
     except Exception as e:
         return f"[Gemini API Error]: {str(e)}"
+
+def get_gemini_response_stream(user_message, chunk_size=20):
+    """
+    Simulates streaming Gemini response by yielding chunks of text.
+    """
+    full_text = get_gemini_response(user_message)
+    for i in range(0, len(full_text), chunk_size):
+        yield full_text[i:i+chunk_size]
