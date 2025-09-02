@@ -28,5 +28,13 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Make socketio available for services
 sys.modules['server_socketio'] = socketio
 
+# SocketIO event: join room
+@socketio.on('join')
+def on_join(data):
+    user_id = data.get('user_id')
+    if user_id:
+        from flask_socketio import join_room
+        join_room(str(user_id))
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
