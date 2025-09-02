@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-	getDemoSessions,
-	getDemoMessages,
-	sendDemoMessage,
-} from "../../demo/demoApi";
+	getSessions,
+	getMessages,
+	sendMessage,
+	createSession,
+} from "../../api/chat";
 import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
 import styles from "./ChatScreen.module.css";
 
-const ChatScreen = () => {
+const ChatScreen = ({ jwt }) => {
 	const [sessions, setSessions] = useState([]);
 	const [selectedSession, setSelectedSession] = useState(null);
 	const [messages, setMessages] = useState([]);
@@ -18,18 +19,30 @@ const ChatScreen = () => {
 	const sideBarRef = useRef(null);
 
 	useEffect(() => {
-		getDemoSessions().then(setSessions);
-	}, []);
+		if (!jwt) return;
+		getSessions(jwt)
+			.then(setSessions)
+			.catch(() => setSessions([]));
+	}, [jwt]);
 
 	useEffect(() => {
-		if (selectedSession) {
-			getDemoMessages(selectedSession).then(setMessages);
+		if (selectedSession && jwt) {
+			getMessages(selectedSession, jwt)
+				.then(setMessages)
+				.catch(() => setMessages([]));
 		}
-	}, [selectedSession]);
+	}, [selectedSession, jwt]);
 
-	// Memoize session buttons
 	const handleSessionSelect = useCallback((sessionId) => {
 		setSelectedSession(sessionId);
+		setInput("");
+		setIsTyping(false);
+		setSidebarOpen(false);
+	}, []);
+
+	const handleNewChat = useCallback(() => {
+		setSelectedSession(null);
+		setMessages([]);
 		setInput("");
 		setIsTyping(false);
 		setSidebarOpen(false);
@@ -53,30 +66,45 @@ const ChatScreen = () => {
 		[sessions, selectedSession, handleSessionSelect]
 	);
 
-	// Memoize message bubbles
 	const messageBubbles = useMemo(
 		() =>
 			messages.map((msg) => <MessageBubble key={msg.id} message={msg} />),
 		[messages]
 	);
 
-	// Memoize handleSend
 	const handleSend = useCallback(async () => {
-		if (!input.trim() || !selectedSession) return;
+		if (!input.trim() || !jwt) return;
 		setIsTyping(true);
-		const { userMsg, aiMsg } = await sendDemoMessage(
-			selectedSession,
-			input
-		);
-		setMessages((msgs) => [...msgs, userMsg]);
+		// If starting a new chat
+		if (!selectedSession && messages.length === 0) {
+			try {
+				const res = await createSession(jwt, "New chat");
+				const newSessionId = res.session_id;
+				setSelectedSession(newSessionId);
+				setSessions((prev) => [
+					...prev,
+					{ id: newSessionId, title: "New chat" },
+				]);
+				await sendMessage(newSessionId, input, jwt);
+				setMessages([{ id: Date.now(), sender: "USER", text: input }]);
+				setInput("");
+				// AI response will be handled via socket streaming in next step
+			} catch (err) {
+				setIsTyping(false);
+			}
+			return;
+		}
+		// ...existing code for sending message...
+		if (!selectedSession) return;
+		await sendMessage(selectedSession, input, jwt);
+		setMessages((msgs) => [
+			...msgs,
+			{ id: Date.now(), sender: "USER", text: input },
+		]);
 		setInput("");
-		setTimeout(() => {
-			setMessages((msgs) => [...msgs, aiMsg]);
-			setIsTyping(false);
-		}, 900); // Simulate AI typing delay
-	}, [input, selectedSession]);
+		// AI response will be handled via socket streaming in next step
+	}, [input, selectedSession, messages.length, jwt]);
 
-	// Close sidebar when clicking outside
 	useEffect(() => {
 		if (!sidebarOpen) return;
 		const handleClick = (e) => {
@@ -100,7 +128,7 @@ const ChatScreen = () => {
 					styles.sideBar + (sidebarOpen ? " " + styles.open : "")
 				}
 			>
-				<div className={styles.newChatBtn}>
+				<div className={styles.newChatBtn} onClick={handleNewChat}>
 					<i className="ri-chat-new-line"></i>
 					<p>New Chat</p>
 				</div>
