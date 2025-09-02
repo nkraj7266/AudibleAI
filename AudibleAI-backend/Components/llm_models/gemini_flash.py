@@ -9,7 +9,7 @@ def get_gemini_response(user_message):
     endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Bearer {api_key}'
+        'x-goog-api-key': api_key
     }
     payload = {
         "contents": [
