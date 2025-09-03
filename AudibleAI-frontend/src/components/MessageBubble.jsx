@@ -20,7 +20,7 @@ const MessageBubble = ({
 					showPlayback &&
 					(isPlaying ? (
 						<i
-							className="ri-pause-circle-fill"
+							className="ri-pause-fill"
 							style={{
 								marginLeft: 8,
 								cursor: "pointer",
