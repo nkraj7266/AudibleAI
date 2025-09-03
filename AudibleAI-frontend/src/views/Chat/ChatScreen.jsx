@@ -420,23 +420,38 @@ const ChatScreen = ({ jwt }) => {
 		if (!selectedSession && messages.length === 0) {
 			try {
 				const res = await createSession(jwt, "New Chat");
-				sessionId = res.session_id;
-				setSelectedSession(sessionId);
+				const sessionId = res.session_id;
+				const userMessage = {
+					id: Date.now(),
+					sender: "USER",
+					text: input,
+				};
+
+				// Update all state first
 				setSessions((prev) => [
 					...prev,
 					{ id: sessionId, title: "New Chat" },
 				]);
-				// Send user message via socket
+				setMessages([userMessage]);
+				setInput("");
+
+				// Use the Promise to ensure selectedSession is set before sending the message
+				await new Promise((resolve) => {
+					setSelectedSession(sessionId);
+					// Give React a chance to update the state
+					setTimeout(resolve, 0);
+				});
+
+				// Now send the message after state is updated
 				const user_id = getJwtUserId(jwt);
 				socket.emit("user:message", {
 					session_id: sessionId,
 					user_id,
-					text: input,
+					text: userMessage.text,
 					is_first_message: true,
 				});
-				setMessages([{ id: Date.now(), sender: "USER", text: input }]);
-				setInput("");
-			} catch (err) {
+			} catch (error) {
+				console.error("Error creating session:", error);
 				setIsTyping(false);
 			}
 		} else if (selectedSession) {
