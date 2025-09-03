@@ -28,7 +28,8 @@ def register_socket_events(socketio):
             app_logger.info(f"Socket user:message for session_id: {session_id}, user_id: {user_id}")
             if session_id and user_id and text:
                 result = handle_user_message(session_id, user_id, text, is_first_message=is_first_message)
-                emit_stream_chunks(socketio, user_id, session_id, result.get('ai_text_chunks', []), delay=os.getenv('STREAM_DELAY', 0.5))
+                emit_stream_chunks(socketio, user_id, session_id, result.get('ai_text_chunks', []), delay=float(os.getenv('STREAM_DELAY', 0.5)))
+                app_logger.info(f"Delay used: {os.getenv('STREAM_DELAY', 0.5)}")
                 emit_response_end(socketio, user_id, session_id, result.get('ai_msg_id'), result.get('ai_text'))
         except Exception as e:
             error_logger.error(f"Socket user:message error: {e}", exc_info=True)
