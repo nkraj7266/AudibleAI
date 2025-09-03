@@ -51,6 +51,33 @@
 	margin: 0.3em 0;
 }
 
+.highlightContainer {
+	position: relative;
+}
+
+.highlightedText {
+	display: inline-block;
+	position: relative;
+	background: rgba(249, 168, 37, 0.2);
+	font-weight: 500;
+	padding: 2px 4px;
+	margin: -2px -4px;
+	border-radius: 3px;
+	box-shadow: 0 0 0 2px rgba(249, 168, 37, 0.1);
+}
+
+/* Ensure markdown inside highlight maintains proper styling */
+.highlightedText p {
+	display: inline;
+	margin: 0;
+}
+
+/* Handle markdown elements inside highlighted text */
+.highlightedText pre,
+.highlightedText code {
+	background: rgba(249, 168, 37, 0.15);
+}
+
 /* Markdown code blocks */
 .text pre,
 .text code {

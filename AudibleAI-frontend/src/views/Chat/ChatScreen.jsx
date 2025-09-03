@@ -10,7 +10,7 @@ import {
 import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
 import styles from "./ChatScreen.module.css";
-import { cacheAudio, getCachedAudio } from "../../utils/audioCache";
+import { useAudioPlayback } from "../../hooks/useAudioPlayback";
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
 
@@ -26,10 +26,20 @@ const ChatScreen = ({ jwt }) => {
 	const aiStreamingRef = useRef("");
 	const messagesEndRef = useRef(null);
 	const [aiStreamingText, setAiStreamingText] = useState("");
-	// Playback state
-	const [playingMessageId, setPlayingMessageId] = useState(null);
-	const [isPaused, setIsPaused] = useState(false);
-	const [highlightedSentenceIdx, setHighlightedSentenceIdx] = useState(null);
+	// Audio playback hook
+	const {
+		currentMessageId: playingMessageId,
+		isPaused,
+		highlightedSentenceIdx,
+		startPlayback,
+		pausePlayback,
+		resumePlayback,
+		stopPlayback,
+		addAudioChunk,
+		finalizeAudio,
+		ensureAudioAvailable,
+		checkCachedAudio,
+	} = useAudioPlayback();
 	const [isGlobalPlaying, setIsGlobalPlaying] = useState(false);
 	// Socket connection setup
 	useEffect(() => {
@@ -170,65 +180,42 @@ const ChatScreen = ({ jwt }) => {
 	);
 
 	// Playback handlers
-	// Audio playback refs
-	const audioRef = useRef(null);
-	const audioChunksRef = useRef([]);
-	const currentAudioUrlRef = useRef(null);
 
 	// Play single message
 	const handlePlayMessage = async (msgId) => {
-		setPlayingMessageId(msgId);
-		setIsPaused(false);
 		setIsGlobalPlaying(false);
-		setHighlightedSentenceIdx(null);
-		audioChunksRef.current = [];
 		const msg = messages.find((m) => m.id === msgId);
 		if (!msg) return;
 
-		// Check cache first
-		const cachedAudio = await getCachedAudio(msgId);
-		if (cachedAudio) {
-			// Use cached audio directly
-			const url = URL.createObjectURL(cachedAudio);
-			currentAudioUrlRef.current = url;
-			if (audioRef.current) {
-				audioRef.current.src = url;
+		try {
+			// First check if we already have the audio cached
+			const hasAudio = await checkCachedAudio(msgId);
+
+			if (hasAudio) {
+				// If we have cached audio, play it directly
+				await startPlayback(msg.id, msg.text);
 			} else {
-				audioRef.current = new Audio(url);
-			}
-			audioRef.current.onended = () => {
-				// Emit tts:stop to maintain consistent behavior
-				const socket = socketRef.current;
-				socket.emit("tts:stop", {
+				// If not cached, request it from the server
+				// Socket event handler will cache and play when received
+				socketRef.current.emit("tts:start", {
 					messageId: msgId,
+					text: msg.text,
 					userId: getJwtUserId(jwt),
 				});
-			};
-			audioRef.current.play();
-			return;
+			}
+		} catch (error) {
+			console.error("Error in message playback:", error);
 		}
-
-		// If not cached, request new TTS
-		const socket = socketRef.current;
-		socket.emit("tts:start", {
-			messageId: msgId,
-			text: msg.text,
-			userId: getJwtUserId(jwt),
-			// Add voice settings here if needed
-		});
 	};
 
 	// Pause single message
 	const handlePauseMessage = (msgId) => {
-		setIsPaused(true);
 		const socket = socketRef.current;
 		socket.emit("tts:stop", {
 			messageId: msgId,
 			userId: getJwtUserId(jwt),
 		});
-		if (audioRef.current) {
-			audioRef.current.pause();
-		}
+		pausePlayback();
 	};
 
 	// Global playback state
@@ -242,8 +229,6 @@ const ChatScreen = ({ jwt }) => {
 			return;
 		}
 		setIsGlobalPlaying(true);
-		setIsPaused(false);
-		setHighlightedSentenceIdx(null);
 		// Get all AI messages
 		const aiMessages = messages.filter((m) => m.sender === "AI");
 		if (aiMessages.length === 0) return;
@@ -257,170 +242,119 @@ const ChatScreen = ({ jwt }) => {
 		if (idx >= aiMessages.length) {
 			// All done
 			setIsGlobalPlaying(false);
-			setPlayingMessageId(null);
-			setIsPaused(false);
-			setHighlightedSentenceIdx(null);
+			stopPlayback();
 			globalPlaybackRef.current.active = false;
 			return;
 		}
-		const msgId = aiMessages[idx].id;
-		setPlayingMessageId(msgId);
-		setIsPaused(false);
-		setHighlightedSentenceIdx(null);
-		audioChunksRef.current = [];
 
-		// Check cache first
-		const cachedAudio = await getCachedAudio(msgId);
-		if (cachedAudio) {
-			// Use cached audio directly
-			const url = URL.createObjectURL(cachedAudio);
-			currentAudioUrlRef.current = url;
-			if (audioRef.current) {
-				audioRef.current.src = url;
-			} else {
-				audioRef.current = new Audio(url);
+		const msg = aiMessages[idx];
+		const userId = getJwtUserId(jwt);
+
+		try {
+			// First ensure we have the audio
+			const audioReady = await ensureAudioAvailable(
+				msg.id,
+				msg.text,
+				socketRef.current,
+				userId
+			);
+
+			if (!audioReady) {
+				console.error("Failed to ensure audio for message:", msg.id);
+				// Skip to next message
+				if (globalPlaybackRef.current.active) {
+					playGlobalMessage(idx + 1);
+				}
+				return;
 			}
-			audioRef.current.onended = () => {
-				// Emit tts:stop to trigger the sequence
-				const socket = socketRef.current;
-				socket.emit("tts:stop", {
-					messageId: msgId,
-					userId: getJwtUserId(jwt),
-				});
-			};
-			audioRef.current.play();
-			return;
-		}
 
-		// If not cached, request new TTS
-		const socket = socketRef.current;
-		socket.emit("tts:start", {
-			messageId: msgId,
-			text: aiMessages[idx].text,
-			userId: getJwtUserId(jwt),
-		});
+			// Now we know we have the audio in cache, play it
+			await startPlayback(msg.id, msg.text, {
+				onComplete: () => {
+					if (globalPlaybackRef.current.active) {
+						playGlobalMessage(idx + 1);
+					}
+				},
+				onError: () => {
+					if (globalPlaybackRef.current.active) {
+						playGlobalMessage(idx + 1);
+					}
+				},
+			});
+		} catch (error) {
+			console.error("Error in global playback:", error);
+			if (globalPlaybackRef.current.active) {
+				playGlobalMessage(idx + 1);
+			}
+		}
 	};
 
 	// Pause global playback
 	const handleGlobalPause = () => {
 		setIsGlobalPlaying(false);
-		setIsPaused(false);
-		setPlayingMessageId(null);
-		setHighlightedSentenceIdx(null);
 		globalPlaybackRef.current.active = false;
 		// Stop current audio
-		if (audioRef.current) {
-			audioRef.current.pause();
-			audioRef.current = null;
-		}
+		stopPlayback();
 	};
 
 	// Socket TTS event listeners
 	useEffect(() => {
 		const socket = socketRef.current;
 		if (!socket) return;
+
 		// Audio chunk assembly
 		socket.on("tts:audio", async (data) => {
-			if (data.messageId !== playingMessageId) return;
-			const chunk = data.bytes;
-			audioChunksRef.current.push(chunk);
+			// Add the chunk for the specific message
+			addAudioChunk(data.bytes, data.messageId);
 			if (data.isLast) {
-				// Check cache first
-				const cachedAudio = await getCachedAudio(data.messageId);
-				if (cachedAudio) {
-					// Use cached audio
-					const url = URL.createObjectURL(cachedAudio);
-					currentAudioUrlRef.current = url;
-					if (audioRef.current) {
-						audioRef.current.src = url;
-					} else {
-						audioRef.current = new Audio(url);
-					}
-				} else {
-					// Assemble audio and cache
-					const audioBlob = new Blob(
-						[
-							...audioChunksRef.current.map((b64) =>
-								Uint8Array.from(atob(b64), (c) =>
-									c.charCodeAt(0)
-								)
-							),
-						],
-						{ type: "audio/mp3" }
-					);
-					// Cache the audio for future use
-					await cacheAudio(data.messageId, audioBlob);
-					const url = URL.createObjectURL(audioBlob);
-					currentAudioUrlRef.current = url;
-					if (audioRef.current) {
-						audioRef.current.src = url;
-					} else {
-						audioRef.current = new Audio(url);
+				const messageText = messages.find(
+					(m) => m.id === data.messageId
+				)?.text;
+				if (messageText) {
+					await finalizeAudio(data.messageId, messageText);
+					// After finalizing, try to play the message if it was requested
+					if (playingMessageId === data.messageId) {
+						await startPlayback(data.messageId, messageText);
 					}
 				}
-				audioRef.current.onended = () => {
-					// Emit tts:stop when audio finishes
-					const socket = socketRef.current;
-					socket.emit("tts:stop", {
-						messageId: playingMessageId,
-						userId: getJwtUserId(jwt),
-					});
-				};
-				audioRef.current.play();
 			}
 		});
-		// Sentence highlighting
-		socket.on("tts:progress", (data) => {
-			if (data.messageId !== playingMessageId) return;
-			setHighlightedSentenceIdx(data.sentenceIndex);
-		});
+
 		// Playback stopped
 		socket.on("tts:stopped", (data) => {
 			// If global playback is active, play next message
 			if (globalPlaybackRef.current.active && isGlobalPlaying) {
-				// Reset current message icon
-				setPlayingMessageId(null);
-				setIsPaused(false);
-				setHighlightedSentenceIdx(null);
-				if (audioRef.current) {
-					audioRef.current.pause();
-					audioRef.current = null;
-				}
+				stopPlayback();
 				// Play next message
 				globalPlaybackRef.current.idx++;
 				playGlobalMessage(globalPlaybackRef.current.idx);
 			} else {
-				// Not global playback, just reset
-				setPlayingMessageId(null);
-				setIsPaused(false);
-				setHighlightedSentenceIdx(null);
-				if (audioRef.current) {
-					audioRef.current.pause();
-					audioRef.current = null;
-				}
+				// Not global playback, just stop
+				stopPlayback();
 			}
 		});
+
 		// Playback error
-		socket.on("tts:error", (data) => {
-			setPlayingMessageId(null);
-			setIsPaused(false);
-			setHighlightedSentenceIdx(null);
-			if (audioRef.current) {
-				audioRef.current.pause();
-				audioRef.current = null;
-			}
+		socket.on("tts:error", () => {
+			stopPlayback();
 			// Optionally show error toast
 		});
+
 		return () => {
 			socket.off("tts:audio");
-			socket.off("tts:progress");
 			socket.off("tts:stopped");
 			socket.off("tts:error");
 		};
-	}, [playingMessageId, jwt, isGlobalPlaying]);
-	// Highlight logic (stub)
-	const isHighlightedSentence = (msgId) =>
-		playingMessageId === msgId && highlightedSentenceIdx !== null;
+	}, [
+		playingMessageId,
+		jwt,
+		isGlobalPlaying,
+		messages,
+		addAudioChunk,
+		finalizeAudio,
+		stopPlayback,
+	]);
+	// Remove the unused highlight logic since we now pass the index directly
 
 	const messageBubbles = useMemo(
 		() =>
@@ -442,9 +376,11 @@ const ChatScreen = ({ jwt }) => {
 							onPlay={() => handlePlayMessage(msg.id)}
 							onPause={() => handlePauseMessage(msg.id)}
 							isPlaying={isPlaying}
-							isHighlightedSentence={isHighlightedSentence(
-								msg.id
-							)}
+							highlightedSentenceIdx={
+								playingMessageId === msg.id
+									? highlightedSentenceIdx
+									: null
+							}
 							showPlayback={showPlayback}
 						/>
 					);
@@ -456,7 +392,11 @@ const ChatScreen = ({ jwt }) => {
 						onPlay={() => handlePlayMessage(msg.id)}
 						onPause={() => handlePauseMessage(msg.id)}
 						isPlaying={isPlaying}
-						isHighlightedSentence={isHighlightedSentence(msg.id)}
+						highlightedSentenceIdx={
+							playingMessageId === msg.id
+								? highlightedSentenceIdx
+								: null
+						}
 						showPlayback={showPlayback}
 					/>
 				);
