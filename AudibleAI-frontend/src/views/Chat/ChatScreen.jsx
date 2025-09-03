@@ -25,6 +25,11 @@ const ChatScreen = ({ jwt }) => {
 	const aiStreamingRef = useRef("");
 	const messagesEndRef = useRef(null);
 	const [aiStreamingText, setAiStreamingText] = useState("");
+	// Playback state
+	const [playingMessageId, setPlayingMessageId] = useState(null);
+	const [isPaused, setIsPaused] = useState(false);
+	const [highlightedSentenceIdx, setHighlightedSentenceIdx] = useState(null);
+	const [isGlobalPlaying, setIsGlobalPlaying] = useState(false);
 	// Socket connection setup
 	useEffect(() => {
 		if (!jwt) return;
@@ -163,25 +168,68 @@ const ChatScreen = ({ jwt }) => {
 		[sessions, selectedSession, handleSessionSelect]
 	);
 
+	// Playback handlers
+	const handlePlayMessage = (msgId) => {
+		setPlayingMessageId(msgId);
+		setIsPaused(false);
+		setIsGlobalPlaying(false);
+		// TODO: Emit tts:start for this message via socket
+	};
+	const handlePauseMessage = (msgId) => {
+		setIsPaused(true);
+		// TODO: Emit tts:stop for this message via socket
+	};
+	const handlePlayAll = () => {
+		setIsGlobalPlaying(true);
+		setPlayingMessageId(null);
+		setIsPaused(false);
+		// TODO: Emit tts:start for all messages via socket
+	};
+	// Highlight logic (stub)
+	const isHighlightedSentence = (msgId) =>
+		playingMessageId === msgId && highlightedSentenceIdx !== null;
+
 	const messageBubbles = useMemo(
 		() =>
 			messages.map((msg, idx) => {
+				const isAI = msg.sender === "AI";
+				const isPlaying = playingMessageId === msg.id && !isPaused;
+				const showPlayback = isAI;
 				// If last message is AI and streaming, use aiStreamingText
-				if (
-					msg.sender === "AI" &&
-					msg.streaming &&
-					idx === messages.length - 1
-				) {
+				if (isAI && msg.streaming && idx === messages.length - 1) {
 					return (
 						<MessageBubble
 							key={msg.id}
 							message={{ ...msg, text: aiStreamingText }}
+							onPlay={() => handlePlayMessage(msg.id)}
+							onPause={() => handlePauseMessage(msg.id)}
+							isPlaying={isPlaying}
+							isHighlightedSentence={isHighlightedSentence(
+								msg.id
+							)}
+							showPlayback={showPlayback}
 						/>
 					);
 				}
-				return <MessageBubble key={msg.id} message={msg} />;
+				return (
+					<MessageBubble
+						key={msg.id}
+						message={msg}
+						onPlay={() => handlePlayMessage(msg.id)}
+						onPause={() => handlePauseMessage(msg.id)}
+						isPlaying={isPlaying}
+						isHighlightedSentence={isHighlightedSentence(msg.id)}
+						showPlayback={showPlayback}
+					/>
+				);
 			}),
-		[messages, aiStreamingText]
+		[
+			messages,
+			aiStreamingText,
+			playingMessageId,
+			isPaused,
+			highlightedSentenceIdx,
+		]
 	);
 
 	const handleSend = useCallback(async () => {
@@ -290,6 +338,20 @@ const ChatScreen = ({ jwt }) => {
 							placeholder="Type your message..."
 							onKeyDown={(e) => e.key === "Enter" && handleSend()}
 						/>
+						{/* Global speaker icon, shown only if there are messages */}
+						{messages.length > 0 && (
+							<i
+								className="ri-volume-up-fill"
+								style={{
+									marginRight: 12,
+									cursor: "pointer",
+									color: "#1565c0",
+									fontSize: "1.5em",
+								}}
+								title="Play all messages"
+								onClick={handlePlayAll}
+							/>
+						)}
 						<button onClick={handleSend}>Send</button>
 					</div>
 				</div>
