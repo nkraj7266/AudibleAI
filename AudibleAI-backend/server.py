@@ -33,8 +33,10 @@ app.register_blueprint(chat_bp)
 socketio = SocketIO(app, cors_allowed_origins="*")
 sys.modules['server_socketio'] = socketio # Make socketio available for services
 
-# Register socket events
-register_socket_events(socketio)
+# Push an application context before registering events
+with app.app_context():
+    # Register socket events
+    register_socket_events(socketio)
 
 # Flask error handler
 @app.errorhandler(Exception)
