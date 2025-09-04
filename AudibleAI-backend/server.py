@@ -1,5 +1,5 @@
 import eventlet
-from psycogreen.gevent import patch_psycopg
+from psycogreen.eventlet import patch_psycopg
 eventlet.monkey_patch()
 patch_psycopg()
 
