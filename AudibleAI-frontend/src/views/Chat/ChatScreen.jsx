@@ -165,20 +165,35 @@ const ChatScreen = ({ jwt }) => {
 		}
 	}, [selectedSession, jwt]);
 
-	const handleSessionSelect = useCallback((sessionId) => {
-		setSelectedSession(sessionId);
-		setInput("");
-		setIsTyping(false);
-		setSidebarOpen(false);
-	}, []);
+	const handleSessionSelect = useCallback(
+		(sessionId) => {
+			// Stop any ongoing playback
+			if (playingMessageId || isGlobalPlaying) {
+				stopPlayback();
+				setIsGlobalPlaying(false);
+				globalPlaybackRef.current.active = false;
+			}
+			setSelectedSession(sessionId);
+			setInput("");
+			setIsTyping(false);
+			setSidebarOpen(false);
+		},
+		[playingMessageId, isGlobalPlaying, stopPlayback]
+	);
 
 	const handleNewChat = useCallback(() => {
+		// Stop any ongoing playback
+		if (playingMessageId || isGlobalPlaying) {
+			stopPlayback();
+			setIsGlobalPlaying(false);
+			globalPlaybackRef.current.active = false;
+		}
 		setSelectedSession(null);
 		setMessages([]);
 		setInput("");
 		setIsTyping(false);
 		setSidebarOpen(false);
-	}, []);
+	}, [playingMessageId, isGlobalPlaying, stopPlayback]);
 
 	const sessionButtons = useMemo(
 		() =>
@@ -476,6 +491,14 @@ const ChatScreen = ({ jwt }) => {
 		setIsTyping(true);
 		let sessionId = selectedSession;
 		const socket = socketRef.current;
+
+		// Stop any ongoing playback before starting a new session or sending a message
+		if (playingMessageId || isGlobalPlaying) {
+			stopPlayback();
+			setIsGlobalPlaying(false);
+			globalPlaybackRef.current.active = false;
+		}
+
 		// If starting a new chat
 		if (!selectedSession && messages.length === 0) {
 			try {
@@ -529,7 +552,16 @@ const ChatScreen = ({ jwt }) => {
 			]);
 			setInput("");
 		}
-	}, [input, selectedSession, messages.length, jwt, isTyping]);
+	}, [
+		input,
+		selectedSession,
+		messages.length,
+		jwt,
+		isTyping,
+		playingMessageId,
+		isGlobalPlaying,
+		stopPlayback,
+	]);
 
 	useEffect(() => {
 		if (!sidebarOpen) return;
