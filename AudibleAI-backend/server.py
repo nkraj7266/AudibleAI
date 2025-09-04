@@ -30,7 +30,13 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(chat_bp)
 
 # SocketIO setup
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    ping_timeout=20,
+    ping_interval=10,
+    async_mode='eventlet'
+)
 sys.modules['server_socketio'] = socketio # Make socketio available for services
 
 # Push an application context before registering events
