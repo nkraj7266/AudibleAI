@@ -1,227 +1,268 @@
-# AudibleAI Frontend
+# AudibleAI - Text-to-Speech Chat Platform
 
-AudibleAI is a modern web application for real-time chat powered by advanced AI models. The frontend is built with React, providing a fast, responsive, and user-friendly interface for interacting with the backend AI services.
+AudibleAI is a real-time, voice-enabled chat platform powered by advanced AI models. It features text-to-speech capabilities, allowing users to both read and listen to AI responses. Built with React (frontend) and Flask (backend), it provides a seamless, interactive chat experience.
 
-## Features
+## Key Features
 
--   Real-time chat with AI responses
--   Auto-scrolling chat window for new messages
--   Beautiful, minimal UI with custom thin scrollbars
--   Modular component structure for maintainability
--   Responsive design for desktop and mobile
--   Error handling and loading indicators
--   Easy integration with backend via REST and Socket.io
+### Chat Functionality
 
-## Project Structure
+-   Real-time chat with AI responses using Socket.io
+-   Streaming AI responses for instant feedback
+-   Chat session management (create, rename, delete)
+-   Chat history persistence
+-   Message streaming with typing indicators
+-   Automatic session title generation
+-   Multi-session support
 
+### Audio Capabilities
+
+-   Real-time text-to-speech conversion
+-   Audio chunk streaming for faster playback
+-   Audio message caching for better performance
+-   Global playback mode for continuous listening
+-   Playback controls (play, stop)
+-   Sentence-level audio highlighting
+
+### User Interface
+
+-   Responsive design for all devices
+-   Beautiful, minimal UI
+-   Auto-scrolling chat window
+-   Sidebar for chat session management
+-   Loading indicators and error handling
+-   Welcome message for new users
+-   Clean and intuitive message bubbles
+
+### Authentication & Security
+
+-   JWT-based authentication
+-   Secure socket connections
+-   Protected API endpoints
+-   User session management
+
+## Technical Architecture
+
+### Frontend (`AudibleAI-frontend/`)
+
+```plaintext
+src/
+├── api/                 # API utilities
+├── components/          # Reusable UI components
+├── hooks/               # Custom React hooks
+├── utils/               # Utility functions
+└── views/               # Main app views
+    ├── Auth/            # Authentication screens
+    ├── Chat/            # Main chat interface
+    └── Home/            # Home screen
 ```
-AudibleAI-frontend/
-├── public/
-│   ├── icons/
-│   └── index.html
-├── src/
-│   ├── api/                   # API utilities
-│   ├── components/            # Reusable UI components
-│   │   └── MessageBubble.jsx
-│   │   └── MessageBubble.module.css
-│   │   └── TypingIndicator.jsx
-│   │   └── TypingIndicator.module.css
-│   ├── hooks/                 # Reusable Custom hooks
-│   │   └── useChatMessages.js
-│   │   └── useSessionManager.js
-│   │   └── useSocket.js
-│   ├── utils/                 # Utility files
-│   │   └── jwt.js
-│   │   └── socket.js
-│   ├── views/                 # Main app views
-│   │   ├── Auth/              # Auth screen and related files
-│   │   |   └── Login.jsx
-│   │   |   └── Login.module.css
-│   │   |   └── Register.jsx
-│   │   |   └── Register.module.css
-│   │   ├── Chat/              # Chat screen and related files
-│   │   |   └── ChatScreen.jsx
-│   │   |   └── ChatScreen.module.css
-│   │   └── Home/              # Home screen and related files
-│   │       └── Home.jsx
-│   │       └── Home.module.css
-│   ├── App.jsx                # Main app component
-│   ├── App.module.css         # Main app component styles
-│   ├── global.css             # Global styles (scrollbar, resets, etc.)
-│   └── index.js               # Entry point
-├── .env.example               # Example environment variables
-├── package.json
-└── README.md
+
+### Backend (`AudibleAI-backend/`)
+
+```plaintext
+├── components/         # Core components
+│   ├── llm_models/     # LLM integration
+│   ├── postgres/       # Database layer
+│   └── tts/            # Text-to-speech service
+├── monolithic/         # Main application
+│   ├── routes/         # API routes
+│   ├── controllers/    # API controllers
+│   ├── services/       # Business logic
+│   ├── socket/         # Socket handlers
+│   └── utils/          # Utility functions
+└── logging_config.py   # Logging configuration
 ```
+
+## API Documentation
+
+### REST Endpoints
+
+#### Authentication
+
+-   `POST /auth/register`
+
+    -   Register new user
+    -   Body: `{ "email": string, "password": string }`
+
+-   `POST /auth/login`
+    -   Login user
+    -   Body: `{ "email": string, "password": string }`
+    -   Returns: `{ "token": string }`
+
+#### Chat Sessions
+
+-   `GET /sessions`
+
+    -   Get all user sessions
+    -   Headers: `Authorization: Bearer <token>`
+
+-   `POST /sessions`
+
+    -   Create new chat session
+    -   Headers: `Authorization: Bearer <token>`
+    -   Body: `{ "title": string }`
+
+-   `PUT /sessions/:sessionId`
+
+    -   Update session title
+    -   Headers: `Authorization: Bearer <token>`
+    -   Body: `{ "title": string }`
+
+-   `DELETE /sessions/:sessionId`
+    -   Delete chat session
+    -   Headers: `Authorization: Bearer <token>`
+
+#### Messages
+
+-   `GET /sessions/:sessionId/messages`
+
+    -   Get all messages in a session
+    -   Headers: `Authorization: Bearer <token>`
+
+-   `POST /sessions/:sessionId/messages`
+    -   Send a message
+    -   Headers: `Authorization: Bearer <token>`
+    -   Body: `{ "text": string }`
+
+### Socket Events
+
+#### Client → Server
+
+-   `user:join`
+
+    -   Join user's room
+    -   Payload: `{ user_id: string }`
+
+-   `user:message`
+
+    -   Send user message
+    -   Payload: `{ session_id: string, user_id: string, text: string, is_first_message?: boolean }`
+
+-   `tts:start`
+
+    -   Start TTS generation
+    -   Payload: `{ messageId: string, text: string, userId: string, voice?: string, speakingRate?: number, pitch?: number }`
+
+-   `tts:stop`
+    -   Stop TTS playback
+    -   Payload: `{ messageId: string, userId: string }`
+
+#### Server → Client
+
+-   `ai:response:chunk`
+
+    -   Streaming AI response chunk
+    -   Payload: `{ session_id: string, chunk: string }`
+
+-   `ai:response:end`
+
+    -   Complete AI response
+    -   Payload: `{ session_id: string, message: { id: string, text: string, sender: "AI" } }`
+
+-   `tts:audio`
+
+    -   Audio chunk
+    -   Payload: `{ messageId: string, bytes: string, chunkSeq: number, isLast: boolean }`
+
+-   `tts:ready`
+
+    -   TTS generation complete
+    -   Payload: `{ messageId: string, duration?: number }`
+
+-   `tts:error`
+
+    -   TTS error
+    -   Payload: `{ messageId: string, code: string, message: string }`
+
+-   `tts:stopped`
+
+    -   TTS playback stopped
+    -   Payload: `{ messageId: string, reason: string }`
+
+-   `session:title:update`
+    -   Session title updated
+    -   Payload: `{ session_id: string, title: string }
 
 ## Getting Started
 
 ### Prerequisites
 
 -   Node.js (v18+ recommended)
--   npm (comes with Node.js)
+-   Python 3.12+
+-   PostgreSQL database
+-   npm/pip package managers
 
-### Installation
+### Frontend Setup
 
-1. Clone the repository:
-    ```sh
+1. Clone repository and navigate to frontend:
+
+    ```bash
     git clone <repo-url>
     cd AudibleAI-frontend
     ```
+
 2. Install dependencies:
-    ```sh
+
+    ```bash
     npm install
     ```
 
-### Running the App
+3. Set up environment variables:
 
-Start the development server:
+    ```plaintext
+    REACT_APP_API_URL=http://localhost:5000
+    REACT_APP_SOCKET_URL=http://localhost:5000
+    ```
 
-```sh
-npm start
-```
+4. Start development server:
 
--   The app will be available at `http://localhost:3000`.
--   The development build supports hot-reloading for fast iteration.
+    ```bash
+    npm start
+    ```
 
-### Building for Production
+### Backend Setup
 
-```sh
-npm run build
-```
+1. Navigate to backend directory:
 
--   This creates an optimized build in the `build/` directory.
-
-## Key Components
-
--   **ChatScreen.jsx**: Main chat interface, handles message rendering, auto-scroll, and user input.
--   **MessageBubble.jsx**: Displays individual chat messages with styling.
--   **global.css**: Global styles including custom scrollbar.
--   **api/**: Contains functions for communicating with the backend (REST/WebSocket).
-
-## Customization
-
--   Modify styles in `global.css` and component `.module.css` files.
--   Add new components in `src/components/` as needed.
--   Update API endpoints in `src/api/` to match your backend configuration.
-
-## Best Practices
-
--   Use functional components and React hooks for state management.
--   Keep components small and focused.
--   Use CSS modules for scoped styles.
--   Handle errors gracefully and provide user feedback.
-
-## Troubleshooting
-
--   If you see CORS errors, ensure the backend allows requests from the frontend origin.
--   For API issues, check the backend server logs and network tab in browser dev tools.
--   For styling issues, verify your CSS selectors and module imports.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
-4. Push to the branch (`git push origin feature/my-feature`)
-5. Open a pull request
-
-## License
-
-MIT
-
-# AudibleAI Backend
-
-AudibleAI backend is a robust Flask application providing REST and WebSocket APIs for real-time AI-powered chat. It integrates with advanced LLMs, manages user authentication, and stores chat history in PostgreSQL.
-
-## Features
-
--   REST API & Socket.io for authentication and chat
--   WebSocket support for real-time messaging
--   Integration with LLM models (e.g., Gemini)
--   PostgreSQL database for persistent storage
--   Modular architecture: controllers, services, queries
--   Centralized error handling and logging (app.log, error.log)
--   JWT-based authentication
--   CORS support for frontend integration
-
-## Project Structure
-
-```
-AudibleAI-backend/
-├── components/
-│   ├── llm_models/            # LLM API integration
-│   │   └── gemini_flash.py
-│   └── postgres/              # DB connection and queries
-│       ├── postgres_conn_utils.py
-│       ├── chat_queries.py
-│       └── auth_queries.py
-├── monolithic/
-│   ├── controllers/           # API endpoints
-│   │   ├── auth_controller.py
-│   │   └── chat_controller.py
-│   ├── services/              # Business logic
-│   │   ├── auth_service.py
-│   │   └── chat_service.py
-│   ├── socket/                # SocketIO events/utilities
-│   │   ├── events.py
-│   │   └── utils.py
-│   ├── utils/                 # Utility functions
-│   │   └── jwt_utils.py
-│   └── routes/                # Blueprints
-│       ├── auth_routes.py
-│       └── chat_routes.py
-├── logging_config.py          # Centralized logging setup
-├── server.py                  # Main app entry point
-├── .env.example               # Example environment variables
-├── requirements.txt           # Python dependencies
-└── README.md
-```
-
-## Getting Started
-
-### Prerequisites
-
--   Python 3.12
--   pip
--   PostgreSQL database
-
-### Installation
-
-1. Clone the repository:
-    ```sh
-    git clone <repo-url>
+    ```bash
     cd AudibleAI-backend
     ```
-2. Create and activate a virtual environment:
-    ```sh
+
+2. Create and activate virtual environment:
+
+    ```bash
     python -m venv .venv
-    .venv\Scripts\activate  # Windows
-    source .venv/bin/activate  # Linux/Mac
+    # Windows
+    .venv\Scripts\activate
+    # Linux/Mac
+    source .venv/bin/activate
     ```
+
 3. Install dependencies:
-    ```sh
+
+    ```bash
     pip install -r requirements.txt
     ```
-4. Set up your `.env` file:
-    ```env
+
+4. Set up environment variables:
+
+    ```plaintext
     PORT=5000
     JWT_SECRET=your_jwt_secret_key
     DATABASE_URL=postgresql://user:password@localhost:5432/audibleai
     LLM_API_KEY=your_llm_api_key
+    TTS_API_KEY=your_text_to_speech_api_key
+    STREAM_DELAY=0.5
     ```
 
-### Running the App
+5. Start the server:
 
-Start the Flask server:
+    ```bash
+    python server.py
+    or
+    flask --app server run
+    ```
 
-```sh
-python server.py
-```
-
--   The backend will be available at `http://localhost:5000`.
-
-## Key Modules
+## Key Backend Modules
 
 -   **server.py**: Main entry, initializes app, DB, blueprints, SocketIO, error handling.
 -   **logging_config.py**: Sets up app and error loggers with file name in log format.
