@@ -159,6 +159,7 @@ export const useAudioPlayback = () => {
 			// Stop any current playback first
 			if (audioRef.current) {
 				audioRef.current.pause();
+				audioRef.current.src = ""; // Release previous audio resources
 			}
 
 			setCurrentMessageId(messageId);
@@ -178,7 +179,21 @@ export const useAudioPlayback = () => {
 			if (audio) {
 				try {
 					// Initialize and wait for audio to be ready
-					await initializeAudio(audio, options.onComplete);
+					const onComplete = () => {
+						// First call any provided onComplete callback
+						if (options.onComplete) {
+							options.onComplete();
+						}
+						// Then clean up
+						if (audioRef.current) {
+							audioRef.current.src = "";
+						}
+						setCurrentMessageId(null);
+						setHighlightedSentenceIdx(null);
+						setIsPaused(false);
+					};
+
+					await initializeAudio(audio, onComplete);
 
 					// Calculate sentence timings
 					timingsRef.current = calculateSentenceTimings(

@@ -202,28 +202,65 @@ const ChatScreen = ({ jwt }) => {
 
 	// Play single message
 	const handlePlayMessage = async (msgId) => {
-		setIsGlobalPlaying(false);
 		const msg = messages.find((m) => m.id === msgId);
 		if (!msg) return;
 
-		try {
-			// First check if we already have the audio cached
-			const hasAudio = await checkCachedAudio(msgId);
-
-			if (hasAudio) {
-				// If we have cached audio, play it directly
-				await startPlayback(msg.id, msg.text);
+		// If this message is different from the currently playing one
+		if (playingMessageId !== msgId) {
+			// If we're in global playback, switch to this message and continue from here
+			if (isGlobalPlaying) {
+				// Find index of clicked message in AI messages
+				const aiMessages = messages.filter((m) => m.sender === "AI");
+				const newIdx = aiMessages.findIndex((m) => m.id === msgId);
+				if (newIdx !== -1) {
+					// Stop current playback
+					stopPlayback();
+					// Start from the new message
+					playGlobalMessage(newIdx);
+				}
 			} else {
-				// If not cached, request it from the server
-				// Socket event handler will cache and play when received
-				socketRef.current.emit("tts:start", {
-					messageId: msgId,
-					text: msg.text,
-					userId: getJwtUserId(jwt),
-				});
+				// Normal single message playback
+				setIsGlobalPlaying(false);
+				globalPlaybackRef.current.active = false;
+				try {
+					// First check if we already have the audio cached
+					const hasAudio = await checkCachedAudio(msgId);
+
+					if (hasAudio) {
+						// If we have cached audio, play it directly
+						await startPlayback(msg.id, msg.text);
+					} else {
+						// If not cached, request it from the server
+						// Socket event handler will cache and play when received
+						socketRef.current.emit("tts:start", {
+							messageId: msgId,
+							text: msg.text,
+							userId: getJwtUserId(jwt),
+						});
+					}
+				} catch (error) {
+					console.error("Error in message playback:", error);
+				}
 			}
-		} catch (error) {
-			console.error("Error in message playback:", error);
+		} else {
+			// If this is the currently playing message, pause it and move to next if in global mode
+			if (isGlobalPlaying) {
+				const aiMessages = messages.filter((m) => m.sender === "AI");
+				const currentIdx = globalPlaybackRef.current.idx;
+				// Stop current playback
+				stopPlayback();
+				// Start next message if available
+				if (currentIdx + 1 < aiMessages.length) {
+					playGlobalMessage(currentIdx + 1);
+				} else {
+					// No more messages, stop global playback
+					setIsGlobalPlaying(false);
+					globalPlaybackRef.current.active = false;
+				}
+			} else {
+				// Just pause if in single message mode
+				pausePlayback();
+			}
 		}
 	};
 
@@ -286,6 +323,9 @@ const ChatScreen = ({ jwt }) => {
 				}
 				return;
 			}
+
+			// Set the current global playback index
+			globalPlaybackRef.current.idx = idx;
 
 			// Now we know we have the audio in cache, play it
 			await startPlayback(msg.id, msg.text, {
