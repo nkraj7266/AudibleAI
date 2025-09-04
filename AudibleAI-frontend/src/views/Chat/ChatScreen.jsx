@@ -97,6 +97,7 @@ const ChatScreen = ({ jwt }) => {
 			aiStreamingRef.current = "";
 			setAiStreamingText("");
 			setMessages((msgs) => {
+				let updatedMsgs;
 				// Replace last streaming AI message with final
 				if (
 					msgs.length &&
@@ -108,10 +109,28 @@ const ChatScreen = ({ jwt }) => {
 						...data.message,
 						streaming: false,
 					};
-					return updated;
+					updatedMsgs = updated;
+				} else {
+					// Otherwise, add final AI message
+					updatedMsgs = [
+						...msgs,
+						{ ...data.message, streaming: false },
+					];
 				}
-				// Otherwise, add final AI message
-				return [...msgs, { ...data.message, streaming: false }];
+
+				// Start generating TTS for this message (without auto-play)
+				// Cache it for future use
+				if (socketRef.current) {
+					const userId = getJwtUserId(jwt);
+					socketRef.current.emit("tts:start", {
+						messageId: data.message.id,
+						text: data.message.text,
+						userId: userId,
+						autoPlay: false,
+					});
+				}
+
+				return updatedMsgs;
 			});
 		});
 
@@ -312,7 +331,7 @@ const ChatScreen = ({ jwt }) => {
 				)?.text;
 				if (messageText) {
 					await finalizeAudio(data.messageId, messageText);
-					// After finalizing, try to play the message if it was requested
+					// Start playback only if this message was manually requested
 					if (playingMessageId === data.messageId) {
 						await startPlayback(data.messageId, messageText);
 					}
@@ -321,15 +340,12 @@ const ChatScreen = ({ jwt }) => {
 		});
 
 		// Playback stopped
-		socket.on("tts:stopped", (data) => {
-			// If global playback is active, play next message
+		socket.on("tts:stopped", () => {
 			if (globalPlaybackRef.current.active && isGlobalPlaying) {
 				stopPlayback();
-				// Play next message
 				globalPlaybackRef.current.idx++;
 				playGlobalMessage(globalPlaybackRef.current.idx);
 			} else {
-				// Not global playback, just stop
 				stopPlayback();
 			}
 		});
@@ -337,7 +353,11 @@ const ChatScreen = ({ jwt }) => {
 		// Playback error
 		socket.on("tts:error", () => {
 			stopPlayback();
-			// Optionally show error toast
+			if (globalPlaybackRef.current.active && isGlobalPlaying) {
+				// On error during global playback, try next message
+				globalPlaybackRef.current.idx++;
+				playGlobalMessage(globalPlaybackRef.current.idx);
+			}
 		});
 
 		return () => {

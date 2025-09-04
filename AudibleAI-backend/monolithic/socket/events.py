@@ -3,7 +3,10 @@ import base64
 import logging
 from flask_socketio import join_room
 from monolithic.services.chat_service import handle_user_message
-from monolithic.socket.utils import emit_stream_chunks, emit_response_end, get_user_room
+from monolithic.socket.utils import (
+    emit_stream_chunks, emit_response_end, 
+    get_user_room, stream_tts_audio
+)
 from monolithic.utils.text_processing import clean_markdown_for_tts
 from logging_config import app_logger, error_logger
 from components.tts.google_chirp import generate_tts_audio
@@ -29,9 +32,18 @@ def register_socket_events(socketio):
             app_logger.info(f"Socket user:message for session_id: {session_id}, user_id: {user_id}")
             if session_id and user_id and text:
                 result = handle_user_message(session_id, user_id, text, is_first_message=is_first_message)
+                
+                # Stream text response chunks
                 emit_stream_chunks(socketio, user_id, session_id, result.get('ai_text_chunks', []), delay=float(os.getenv('STREAM_DELAY', 0.5)))
                 app_logger.info(f"Delay used: {os.getenv('STREAM_DELAY', 0.5)}")
-                emit_response_end(socketio, user_id, session_id, result.get('ai_msg_id'), result.get('ai_text'))
+                
+                # Send complete response and trigger auto TTS
+                ai_msg_id = result.get('ai_msg_id')
+                ai_text = result.get('ai_text')
+                emit_response_end(socketio, user_id, session_id, ai_msg_id, ai_text)
+                
+                # Generate and stream TTS audio with auto-play flag
+                stream_tts_audio(socketio, user_id, ai_msg_id, ai_text, auto_play=True)
         except Exception as e:
             error_logger.error(f"Socket user:message error: {e}", exc_info=True)
 

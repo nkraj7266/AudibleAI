@@ -49,15 +49,22 @@ export const useAudioPlayback = () => {
 
 	// Initialize audio playback
 	const initializeAudio = async (audio, onComplete) => {
-		const url = URL.createObjectURL(audio);
+		// Stop any existing playback first
 		if (audioRef.current) {
-			audioRef.current.src = url;
-		} else {
-			audioRef.current = new Audio(url);
-			audioRef.current.addEventListener("timeupdate", handleTimeUpdate);
+			audioRef.current.pause();
+			audioRef.current.removeEventListener(
+				"timeupdate",
+				handleTimeUpdate
+			);
+			audioRef.current = null;
 		}
 
-		// Always recreate ended event listener to handle new onComplete callback
+		// Create new audio instance
+		const url = URL.createObjectURL(audio);
+		audioRef.current = new Audio(url);
+		audioRef.current.addEventListener("timeupdate", handleTimeUpdate);
+
+		// Set up completion handler
 		audioRef.current.onended = () => {
 			setCurrentMessageId(null);
 			setHighlightedSentenceIdx(null);
@@ -66,6 +73,16 @@ export const useAudioPlayback = () => {
 				onComplete();
 			}
 		};
+
+		// Wait for audio to be ready
+		return new Promise((resolve, reject) => {
+			audioRef.current.oncanplaythrough = () => {
+				resolve();
+			};
+			audioRef.current.onerror = () => {
+				reject(new Error("Failed to load audio"));
+			};
+		});
 	};
 
 	// Ensure audio is available (either cached or fetched)
@@ -139,6 +156,11 @@ export const useAudioPlayback = () => {
 	// Start playback with text highlighting
 	const startPlayback = async (messageId, text, options = {}) => {
 		try {
+			// Stop any current playback first
+			if (audioRef.current) {
+				audioRef.current.pause();
+			}
+
 			setCurrentMessageId(messageId);
 			setIsPaused(false);
 			setHighlightedSentenceIdx(null);
@@ -154,22 +176,26 @@ export const useAudioPlayback = () => {
 			}
 
 			if (audio) {
-				await initializeAudio(audio, options.onComplete);
+				try {
+					// Initialize and wait for audio to be ready
+					await initializeAudio(audio, options.onComplete);
 
-				// Calculate sentence timings once audio is loaded
-				audioRef.current.addEventListener(
-					"loadedmetadata",
-					() => {
-						timingsRef.current = calculateSentenceTimings(
-							sentences,
-							audioRef.current.duration
-						);
-					},
-					{ once: true }
-				);
+					// Calculate sentence timings
+					timingsRef.current = calculateSentenceTimings(
+						sentences,
+						audioRef.current.duration
+					);
 
-				audioRef.current.play();
-				return true;
+					// Start playback
+					await audioRef.current.play();
+					return true;
+				} catch (error) {
+					console.error("Audio playback failed:", error);
+					if (options.onError) {
+						options.onError(error);
+					}
+					return false;
+				}
 			}
 			return false;
 		} catch (error) {
@@ -197,11 +223,12 @@ export const useAudioPlayback = () => {
 		}
 	};
 
-	// Stop playback
+	// Stop playback and cleanup
 	const stopPlayback = () => {
 		if (audioRef.current) {
 			audioRef.current.pause();
 			audioRef.current.currentTime = 0;
+			audioRef.current.src = ""; // Release audio resources
 		}
 		setCurrentMessageId(null);
 		setHighlightedSentenceIdx(null);
