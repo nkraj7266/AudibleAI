@@ -64,7 +64,7 @@ def emit_stream_chunks(socketio, user_id, session_id, chunks, delay=0.5):
                 'session_id': session_id,
                 'chunk': chunk
             }, room=room)
-            time.sleep(delay)
+            socketio.sleep(delay)
         app_logger.info(f"Emitted {len(chunks)} AI response chunks to user_id: {user_id}, session_id: {session_id}")
     except Exception as e:
         error_logger.error(f"emit_stream_chunks error: {e}", exc_info=True)

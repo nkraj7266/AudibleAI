@@ -1,5 +1,7 @@
 import eventlet
+from psycogreen.gevent import patch_psycopg
 eventlet.monkey_patch()
+patch_psycopg()
 
 import os
 import sys
