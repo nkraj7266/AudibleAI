@@ -119,18 +119,6 @@ const ChatScreen = ({ jwt }) => {
 					];
 				}
 
-				// Start generating TTS for this message (without auto-play)
-				// Cache it for future use
-				if (socketRef.current) {
-					const userId = getJwtUserId(jwt);
-					socketRef.current.emit("tts:start", {
-						messageId: data.message.id,
-						text: data.message.text,
-						userId: userId,
-						autoPlay: false,
-					});
-				}
-
 				return updatedMsgs;
 			});
 		});
@@ -246,13 +234,18 @@ const ChatScreen = ({ jwt }) => {
 						// If we have cached audio, play it directly
 						await startPlayback(msg.id, msg.text);
 					} else {
-						// If not cached, request it from the server
-						// Socket event handler will cache and play when received
-						socketRef.current.emit("tts:start", {
-							messageId: msgId,
-							text: msg.text,
-							userId: getJwtUserId(jwt),
-						});
+						// First ensure we have the audio
+						const audioReady = await ensureAudioAvailable(
+							msg.id,
+							msg.text,
+							socketRef.current,
+							getJwtUserId(jwt)
+						);
+
+						if (audioReady) {
+							// Now play the cached audio
+							await startPlayback(msg.id, msg.text);
+						}
 					}
 				} catch (error) {
 					console.error("Error in message playback:", error);
@@ -386,11 +379,10 @@ const ChatScreen = ({ jwt }) => {
 					(m) => m.id === data.messageId
 				)?.text;
 				if (messageText) {
-					await finalizeAudio(data.messageId, messageText);
-					// Start playback only if this message was manually requested
-					if (playingMessageId === data.messageId) {
-						await startPlayback(data.messageId, messageText);
-					}
+					// Just cache the audio without auto-playing
+					await finalizeAudio(data.messageId, messageText, {
+						skipPlayback: true, // Don't auto-play when caching
+					});
 				}
 			}
 		});
@@ -422,13 +414,10 @@ const ChatScreen = ({ jwt }) => {
 			socket.off("tts:error");
 		};
 	}, [
-		playingMessageId,
-		jwt,
-		isGlobalPlaying,
-		messages,
-		addAudioChunk,
-		finalizeAudio,
-		stopPlayback,
+		// Remove dependencies that don't need to trigger socket reconnection
+		messages, // needed for finding message text
+		addAudioChunk, // needed for audio chunk handling
+		finalizeAudio, // needed for audio finalization
 	]);
 	// Remove the unused highlight logic since we now pass the index directly
 
@@ -511,17 +500,18 @@ const ChatScreen = ({ jwt }) => {
 					text: input,
 				};
 
-				// Update all state first
-				setSessions((prev) => [
-					...prev,
-					{ id: sessionId, title: "New Chat" },
-				]);
-				setMessages([userMessage]);
-				setInput("");
-
-				// Use the Promise to ensure selectedSession is set before sending the message
+				// Update all state in the correct order
 				await new Promise((resolve) => {
+					// First set the session ID so useEffect knows which session to load messages for
 					setSelectedSession(sessionId);
+					// Add the new session to the list
+					setSessions((prev) => [
+						...prev,
+						{ id: sessionId, title: "New Chat" },
+					]);
+					// Then update messages
+					setMessages([userMessage]);
+					setInput("");
 					// Give React a chance to update the state
 					setTimeout(resolve, 0);
 				});
