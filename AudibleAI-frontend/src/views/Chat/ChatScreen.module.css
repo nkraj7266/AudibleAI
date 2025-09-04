@@ -46,6 +46,31 @@
 	flex-direction: column;
 }
 
+.logoutBtn {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: #d32f2f;
+	background: none;
+	border: none;
+	border-radius: 0.7em;
+	padding: 0.7em 1em;
+	font-size: 1em;
+	font-weight: 600;
+	cursor: pointer;
+	margin-top: auto;
+	transition: background 0.2s, color 0.2s;
+}
+
+.logoutBtn:hover {
+	background: #ffebee;
+}
+
+.logoutBtn i {
+	font-size: 1.2em;
+	font-weight: 400;
+}
+
 .sessionsHead {
 	font-size: 1em;
 	font-weight: 600;
@@ -114,6 +139,31 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.2em;
+	position: relative;
+}
+
+.greetingContainer {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	text-align: center;
+}
+
+.greetingTitle {
+	font-size: 2.5em;
+	font-weight: bold;
+	color: #2a3b4c;
+	margin-bottom: 0.2em;
+}
+
+.greetingSubtitle {
+	font-size: 1.2em;
+	color: #546e7a;
 }
 
 .inputArea {

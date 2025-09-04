@@ -7,6 +7,7 @@ import {
 	sendMessage,
 	createSession,
 } from "../../api/chat";
+import { logoutUser } from "../../api/auth";
 import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
 import styles from "./ChatScreen.module.css";
@@ -601,6 +602,30 @@ const ChatScreen = ({ jwt }) => {
 						<p>Chats</p>
 					</div>
 					{sessionButtons}
+					<button
+						className={styles.logoutBtn}
+						onClick={async () => {
+							// Stop any ongoing playback first
+							if (playingMessageId || isGlobalPlaying) {
+								stopPlayback();
+								setIsGlobalPlaying(false);
+								globalPlaybackRef.current.active = false;
+							}
+
+							try {
+								await logoutUser(jwt);
+								// Redirect to login page or update app state
+								window.location.href = "/login"; // or use your routing mechanism
+							} catch (error) {
+								console.error("Error during logout:", error);
+								// Still redirect even if there's an error
+								window.location.href = "/login";
+							}
+						}}
+					>
+						<i className="ri-logout-box-line"></i>
+						<span>Logout</span>
+					</button>
 				</div>
 				<button
 					className={`${styles.breadcrumbBtn} center`}
@@ -612,6 +637,16 @@ const ChatScreen = ({ jwt }) => {
 			<div className={styles.chatAreaBox}>
 				<div className={styles.chatArea}>
 					<div className={styles.messagesContainer}>
+						{messages.length === 0 && !isTyping && (
+							<div className={styles.greetingContainer}>
+								<h1 className={styles.greetingTitle}>
+									Hi, Let's Chat
+								</h1>
+								<p className={styles.greetingSubtitle}>
+									Send a message to start the conversation
+								</p>
+							</div>
+						)}
 						{messageBubbles}
 						{isTyping && <TypingIndicator />}
 						<div ref={messagesEndRef} />
