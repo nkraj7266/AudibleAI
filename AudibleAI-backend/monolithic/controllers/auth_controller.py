@@ -32,7 +32,7 @@ def login():
 def logout():
     try:
         token = request.headers.get('Authorization', '').replace('Bearer ', '')
-        app_logger.info(f"Logout attempt with token: {token}")
+        app_logger.info(f"Logout attempt with token: {token[:30]}...")
         result, status = logout_user(token)
         return jsonify(result), status
     except Exception as e:

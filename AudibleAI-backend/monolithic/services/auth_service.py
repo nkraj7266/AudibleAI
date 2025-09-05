@@ -51,7 +51,7 @@ def login_user(email, password):
 
 def logout_user(token):
     try:
-        app_logger.info(f"Logout called for token: {token}")
+        app_logger.info(f"Logout called for token: {token[:30]}...")
         # JWT is stateless; client should delete token
         return {'message': 'Logged out'}, 200
     except Exception as e:
