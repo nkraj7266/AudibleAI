@@ -1,7 +1,7 @@
-import eventlet
-from psycogreen.eventlet import patch_psycopg
-eventlet.monkey_patch()
-patch_psycopg()
+# import eventlet
+# from psycogreen.eventlet import patch_psycopg
+# eventlet.monkey_patch()
+# patch_psycopg()
 
 import os
 import sys
@@ -35,9 +35,9 @@ app.register_blueprint(chat_bp)
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    ping_timeout=20,
-    ping_interval=10,
-    async_mode='eventlet'
+    # ping_timeout=20,
+    # ping_interval=10,
+    # async_mode='eventlet'
 )
 sys.modules['server_socketio'] = socketio # Make socketio available for services
 
