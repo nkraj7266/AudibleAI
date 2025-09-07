@@ -208,7 +208,7 @@
 		position: fixed;
 		top: 0;
 		left: 0;
-		height: 100vh;
+		height: var(--app-height, 100vh);
 		width: 80vw;
 		max-width: 340px;
 		box-shadow: 2px 0 16px rgba(0, 0, 0, 0.12);
@@ -230,14 +230,14 @@
 	}
 	.chatArea {
 		padding-bottom: 0;
-		height: 100vh;
+		height: var(--app-height, 100vh);
 		position: relative;
 	}
 }
 
 @media (max-width: 480px) {
 	.sideBar {
-		height: 100vh;
+		height: var(--app-height, 100vh);
 		padding: 0.5em 1em;
 		border-radius: 0 1em 1em 0;
 	}
