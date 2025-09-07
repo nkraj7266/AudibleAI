@@ -31,14 +31,3 @@ def get_gemini_response(user_message):
     except Exception as e:
         error_logger.error(f"Gemini API Error: {e}", exc_info=True)
         return f"[Gemini API Error]: {str(e)}"
-
-def get_gemini_response_stream(user_message, chunk_size=20):
-    """
-    Simulates streaming Gemini response by yielding chunks of text.
-    """
-    try:
-        full_text = get_gemini_response(user_message)
-        for i in range(0, len(full_text), chunk_size):
-            yield full_text[i:i+chunk_size]
-    except Exception as e:
-        error_logger.error(f"Gemini stream error: {e}", exc_info=True)

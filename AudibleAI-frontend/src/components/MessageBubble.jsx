@@ -6,7 +6,6 @@ import { splitIntoSentences } from "../utils/textSegmentation";
 const MessageBubble = ({
 	message,
 	onPlay,
-	onPause,
 	isPlaying,
 	highlightedSentenceIdx,
 	showPlayback,
@@ -17,7 +16,7 @@ const MessageBubble = ({
 		[message.text]
 	);
 
-	// Create highlighted text display
+	// Create highlighted text display with markdown support
 	const content = useMemo(() => {
 		if (!message.text) return null;
 
@@ -26,28 +25,27 @@ const MessageBubble = ({
 			highlightedSentenceIdx === null ||
 			!sentences[highlightedSentenceIdx]
 		) {
-			return <ReactMarkdown breaks>{message.text}</ReactMarkdown>;
+			return <ReactMarkdown>{message.text}</ReactMarkdown>;
 		}
 
 		const currentSentence = sentences[highlightedSentenceIdx];
 		const { start, end } = currentSentence;
 
+		// For highlighting, we need to work with the original markdown text
 		return (
 			<div className={styles.highlightContainer}>
 				{start > 0 && (
-					<ReactMarkdown breaks>
+					<ReactMarkdown>
 						{message.text.slice(0, start)}
 					</ReactMarkdown>
 				)}
 				<span className={styles.highlightedText}>
-					<ReactMarkdown breaks>
+					<ReactMarkdown>
 						{message.text.slice(start, end)}
 					</ReactMarkdown>
 				</span>
 				{end < message.text.length && (
-					<ReactMarkdown breaks>
-						{message.text.slice(end)}
-					</ReactMarkdown>
+					<ReactMarkdown>{message.text.slice(end)}</ReactMarkdown>
 				)}
 			</div>
 		);
@@ -65,11 +63,11 @@ const MessageBubble = ({
 						style={{
 							marginLeft: 8,
 							cursor: "pointer",
-							color: "#f9a825",
+							color: isPlaying ? "#d32f2f" : "#1565c0",
 							fontSize: "1.2em",
 						}}
-						title={isPlaying ? "Pause playback" : "Play message"}
-						onClick={isPlaying ? onPause : onPlay}
+						title={isPlaying ? "Playing..." : "Play message"}
+						onClick={onPlay}
 					/>
 				)}
 			</span>

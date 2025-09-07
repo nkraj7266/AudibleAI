@@ -1,6 +1,7 @@
+import re
 from markdown_it import MarkdownIt
 from mdit_plain.renderer import RendererPlain
-import re
+from logging_config import app_logger, error_logger
 
 def clean_markdown_for_tts(markdown_text):
     """
@@ -46,3 +47,22 @@ def clean_markdown_for_tts(markdown_text):
     text = ' '.join(text.split())
     
     return text.strip()
+
+def split_text_into_sentences(text):
+    """
+    Split text into sentences.
+    This is a simplified version that splits by common terminators.
+    """
+    if not text:
+        return []
+    
+    # Use a regex to split sentences, keeping the delimiters.
+    # This looks for one or more non-terminator characters, followed by a terminator.
+    sentence_endings = r'(?<=[.!?])\s+'
+    sentences = re.split(sentence_endings, text)
+    
+    # Filter out any empty strings that might result from the split
+    sentences = [s.strip() for s in sentences if s and s.strip()]
+    
+    app_logger.debug(f"Split text into {len(sentences)} sentences")
+    return sentences

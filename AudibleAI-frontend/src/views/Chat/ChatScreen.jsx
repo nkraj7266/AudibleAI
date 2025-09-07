@@ -1,17 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
 import { getJwtUserId } from "../../utils/jwt";
-import {
-	getSessions,
-	getMessages,
-	sendMessage,
-	createSession,
-} from "../../api/chat";
+import { getSessions, getMessages, createSession } from "../../api/chat";
 import { logoutUser } from "../../api/auth";
 import MessageBubble from "../../components/MessageBubble";
 import TypingIndicator from "../../components/TypingIndicator";
 import styles from "./ChatScreen.module.css";
 import { useAudioPlayback } from "../../hooks/useAudioPlayback";
+import toast from "react-hot-toast";
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
 
@@ -24,176 +20,311 @@ const ChatScreen = ({ jwt }) => {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const sideBarRef = useRef(null);
 	const socketRef = useRef(null);
-	const aiStreamingRef = useRef("");
 	const messagesEndRef = useRef(null);
-	const [aiStreamingText, setAiStreamingText] = useState("");
-	// Audio playback hook
+	const [socketConnected, setSocketConnected] = useState(false);
+	const lastMessageTextRef = useRef({});
+
+	// Streaming state
+	const [streamingMarkdown, setStreamingMarkdown] = useState("");
+	const [streamingMessageId, setStreamingMessageId] = useState(null);
+	const tempMessageIdRef = useRef(null);
+
+	// Audio playback hook with socket reference
 	const {
-		currentMessageId: playingMessageId,
+		currentMessageId,
+		currentSentenceIndex,
+		isPlaying,
 		isPaused,
-		highlightedSentenceIdx,
-		startPlayback,
+		isGlobalPlayback,
+		addSentenceAudioChunk,
+		transferMessageAudio,
+		playSingleMessage,
+		startGlobalPlayback,
+		startPlaybackFromMessage,
 		pausePlayback,
 		resumePlayback,
-		stopPlayback,
-		addAudioChunk,
-		finalizeAudio,
-		ensureAudioAvailable,
-		checkCachedAudio,
-	} = useAudioPlayback();
-	const [isGlobalPlaying, setIsGlobalPlaying] = useState(false);
+		stopGlobalPlayback,
+		setMessageTotalSentences,
+	} = useAudioPlayback(socketRef.current);
 
-	useEffect(() => {
-		const setAppHeight = () => {
-			const doc = document.documentElement;
-			doc.style.setProperty("--app-height", `${window.innerHeight}px`);
-		};
-		window.addEventListener("resize", setAppHeight);
-		setAppHeight();
-
-		return () => window.removeEventListener("resize", setAppHeight);
-	}, []);
 	// Socket connection setup
 	useEffect(() => {
 		if (!jwt) return;
+
 		if (!socketRef.current) {
+			console.log("[Socket] Initializing connection...");
 			socketRef.current = io(SOCKET_URL, {
 				auth: { token: jwt },
 				transports: ["websocket"],
 			});
-			// Emit join event with user_id (from JWT)
-			try {
-				const user_id = getJwtUserId(jwt);
-				if (user_id) {
-					socketRef.current.emit("user:join", { user_id });
+
+			const socket = socketRef.current;
+
+			socket.on("connect", () => {
+				console.log("[Socket] Connected successfully.");
+				setSocketConnected(true);
+				try {
+					const user_id = getJwtUserId(jwt);
+					if (user_id) {
+						console.log(
+							`[Socket] Emitting user:join for user_id: ${user_id}`
+						);
+						socket.emit("user:join", { user_id });
+					}
+				} catch (error) {
+					console.error("[Socket] Error joining user room:", error);
 				}
-			} catch {}
+			});
+
+			socket.on("disconnect", () => {
+				console.log("[Socket] Disconnected.");
+				setSocketConnected(false);
+			});
 		}
+
+		return () => {
+			if (socketRef.current) {
+				console.log("[Socket] Disconnecting...");
+				socketRef.current.disconnect();
+				socketRef.current = null;
+				setSocketConnected(false);
+			}
+		};
+	}, [jwt]);
+
+	// Socket event listeners for new dual-track approach
+	useEffect(() => {
 		const socket = socketRef.current;
+		if (!socket || !socketConnected) return;
 
-		// Listen for AI response chunks
-		socket.on("ai:response:chunk", (data) => {
-			if (data.session_id !== selectedSession) return;
-			setIsTyping(true);
-			aiStreamingRef.current += data.chunk;
-			setAiStreamingText(aiStreamingRef.current);
-			// Show partial AI message
-			setMessages((msgs) => {
-				// If last message is AI and streaming, update it
-				if (
-					msgs.length &&
-					msgs[msgs.length - 1].sender === "AI" &&
-					msgs[msgs.length - 1].streaming
-				) {
-					const updated = [...msgs];
-					updated[updated.length - 1].text = aiStreamingRef.current;
-					return updated;
-				}
-				// Otherwise, add new streaming AI message
-				return [
-					...msgs,
-					{
-						id: Date.now(),
-						sender: "AI",
-						text: aiStreamingRef.current,
-						streaming: true,
-					},
-				];
-			});
-		});
+		console.log("[Socket] Registering event listeners...");
 
-		// Listen for AI response end
-		socket.on("ai:response:end", (data) => {
+		// Handle AI response content (Track 1: Full markdown for rendering)
+		const handleResponseContent = (data) => {
+			console.log("[Socket] Received 'ai:response:content'", data);
 			if (data.session_id !== selectedSession) return;
+
 			setIsTyping(false);
-			aiStreamingRef.current = "";
-			setAiStreamingText("");
-			setMessages((msgs) => {
-				let updatedMsgs;
-				// Replace last streaming AI message with final
-				if (
-					msgs.length &&
-					msgs[msgs.length - 1].sender === "AI" &&
-					msgs[msgs.length - 1].streaming
-				) {
-					const updated = [...msgs];
-					updated[updated.length - 1] = {
-						...data.message,
-						streaming: false,
-					};
-					updatedMsgs = updated;
-				} else {
-					// Otherwise, add final AI message
-					updatedMsgs = [
-						...msgs,
-						{ ...data.message, streaming: false },
-					];
+			setStreamingMarkdown("");
+
+			// Add the complete AI message to messages
+			const newMessage = {
+				id: data.message_id,
+				sender: "AI",
+				text: data.markdown_text,
+				total_sentences: data.total_sentences,
+			};
+
+			// Store total sentences for audio playback logic
+			if (data.total_sentences) {
+				console.log(
+					`[Audio] Message ${data.message_id} has ${data.total_sentences} total sentences`
+				);
+				setMessageTotalSentences(data.message_id, data.total_sentences);
+			}
+
+			setMessages((prevMessages) => {
+				// If the message already exists, do nothing. Otherwise, add it.
+				if (prevMessages.some((msg) => msg.id === data.message_id)) {
+					console.log(
+						`[State] Message ${data.message_id} already exists. Not adding duplicate.`
+					);
+					return prevMessages;
 				}
-
-				return updatedMsgs;
+				console.log(
+					`[State] Adding new message ${data.message_id} to state.`
+				);
+				return [...prevMessages, newMessage];
 			});
-		});
 
-		// Listen for session title update
-		socket.on("session:title:update", (data) => {
+			setStreamingMessageId(data.message_id);
+
+			// Transfer audio data from temporary ID to real message ID
+			if (
+				tempMessageIdRef.current &&
+				data.message_id !== tempMessageIdRef.current
+			) {
+				console.log(
+					`[Audio] Transferring audio from temp ID ${tempMessageIdRef.current} to final ID ${data.message_id}`
+				);
+				transferMessageAudio(tempMessageIdRef.current, data.message_id);
+			}
+
+			tempMessageIdRef.current = null;
+		};
+
+		// Handle sentence highlighting (Track 2: Plain text for coordination)
+		const handleSentenceHighlight = (data) => {
+			// This event is for visual coordination, logging for now.
+			console.log("[Socket] Received 'ai:sentence:highlight'", data);
+			if (data.session_id !== selectedSession) return;
+			// Store the plain text of the last sentence for potential use
+			lastMessageTextRef.current[data.message_id] = data.plain_text;
+		};
+
+		// Handle sentence audio chunks
+		const handleSentenceAudio = (data) => {
+			console.log(
+				`[Socket] Received 'ai:sentence:audio' for sentence ${data.sentence_index}, is_last: ${data.is_last}`
+			);
+			if (data.session_id !== selectedSession) return;
+
+			// Use the final message ID if available, otherwise use temporary ID
+			let messageId = streamingMessageId || tempMessageIdRef.current;
+
+			if (!messageId) {
+				// Create temporary ID if we don't have one yet
+				messageId = `temp_${Date.now()}`;
+				tempMessageIdRef.current = messageId;
+				console.log(
+					`[State] Created temporary message ID: ${messageId}`
+				);
+			}
+
+			// Add audio chunk for the specific sentence
+			addSentenceAudioChunk(
+				messageId,
+				data.sentence_index,
+				data.bytes,
+				data.is_last
+			);
+		};
+
+		// Handle response completion
+		const handleResponseComplete = (data) => {
+			console.log("[Socket] Received 'ai:response:complete'", data);
+			if (data.session_id !== selectedSession) return;
+
+			// Final cleanup for streaming state
+			setIsTyping(false);
+			setStreamingMarkdown("");
+			setStreamingMessageId(data.message_id);
+
+			// Auto-start playback for new messages if global playback is on
+			if (data.message_id && isGlobalPlayback) {
+				console.log(
+					`[Playback] Global playback is active, continuing with new message: ${data.message_id}`
+				);
+				// The playNextMessageInGlobalQueue will handle playing this message
+			}
+		};
+
+		// Handle session title updates
+		const handleSessionTitleUpdate = (data) => {
+			console.log("[Socket] Received 'session:title:update'", data);
 			setSessions((prevSessions) =>
 				prevSessions.map((s) =>
 					s.id === data.session_id ? { ...s, title: data.title } : s
 				)
 			);
-		});
+		};
+
+		// Handle errors
+		const handleResponseError = (data) => {
+			console.error("[Socket] Received 'ai:response:error'", data);
+			if (data.session_id !== selectedSession) return;
+			setIsTyping(false);
+			setStreamingMarkdown("");
+			toast.error(`AI Error: ${data.error}`);
+		};
+
+		// Register event listeners with new event names
+		socket.on("ai:response:content", handleResponseContent);
+		socket.on("ai:sentence:highlight", handleSentenceHighlight);
+		socket.on("ai:sentence:audio", handleSentenceAudio);
+		socket.on("ai:response:complete", handleResponseComplete);
+		socket.on("session:title:update", handleSessionTitleUpdate);
+		socket.on("ai:response:error", handleResponseError);
 
 		return () => {
-			socket.off("ai:response:chunk");
-			socket.off("ai:response:end");
-			socket.off("session:title:update");
+			console.log("[Socket] Unregistering event listeners...");
+			socket.off("ai:response:content", handleResponseContent);
+			socket.off("ai:sentence:highlight", handleSentenceHighlight);
+			socket.off("ai:sentence:audio", handleSentenceAudio);
+			socket.off("ai:response:complete", handleResponseComplete);
+			socket.off("session:title:update", handleSessionTitleUpdate);
+			socket.off("ai:response:error", handleResponseError);
 		};
-	}, [jwt, selectedSession]);
+	}, [
+		socketConnected,
+		selectedSession,
+		streamingMessageId,
+		messages,
+		isGlobalPlayback,
+		addSentenceAudioChunk,
+		transferMessageAudio,
+		playSingleMessage,
+		startPlaybackFromMessage,
+		streamingMarkdown,
+		setMessageTotalSentences, // Added dependency
+	]);
 
 	useEffect(() => {
 		if (!jwt) return;
+		console.log("[API] Fetching sessions...");
 		getSessions(jwt)
-			.then(setSessions)
-			.catch(() => setSessions([]));
+			.then((data) => {
+				console.log("[API] Sessions fetched successfully:", data);
+				setSessions(data);
+			})
+			.catch((err) => {
+				console.error("[API] Failed to fetch sessions:", err);
+				setSessions([]);
+			});
 	}, [jwt]);
 
 	useEffect(() => {
 		if (selectedSession && jwt) {
+			console.log(
+				`[API] Fetching messages for session: ${selectedSession}`
+			);
 			getMessages(selectedSession, jwt)
-				.then(setMessages)
-				.catch(() => setMessages([]));
+				.then((data) => {
+					console.log(
+						`[API] Messages fetched successfully for session ${selectedSession}:`,
+						data
+					);
+					setMessages(data);
+				})
+				.catch((err) => {
+					console.error(
+						`[API] Failed to fetch messages for session ${selectedSession}:`,
+						err
+					);
+					setMessages([]);
+				});
 		}
 	}, [selectedSession, jwt]);
 
 	const handleSessionSelect = useCallback(
 		(sessionId) => {
+			console.log(`[State] Selecting session: ${sessionId}`);
 			// Stop any ongoing playback
-			if (playingMessageId || isGlobalPlaying) {
-				stopPlayback();
-				setIsGlobalPlaying(false);
-				globalPlaybackRef.current.active = false;
-			}
+			stopGlobalPlayback();
 			setSelectedSession(sessionId);
 			setInput("");
 			setIsTyping(false);
 			setSidebarOpen(false);
+			setStreamingMarkdown("");
+			setStreamingMessageId(null);
+			tempMessageIdRef.current = null;
 		},
-		[playingMessageId, isGlobalPlaying, stopPlayback]
+		[stopGlobalPlayback]
 	);
 
 	const handleNewChat = useCallback(() => {
+		console.log("[State] Starting new chat.");
 		// Stop any ongoing playback
-		if (playingMessageId || isGlobalPlaying) {
-			stopPlayback();
-			setIsGlobalPlaying(false);
-			globalPlaybackRef.current.active = false;
-		}
+		stopGlobalPlayback();
 		setSelectedSession(null);
 		setMessages([]);
 		setInput("");
 		setIsTyping(false);
 		setSidebarOpen(false);
-	}, [playingMessageId, isGlobalPlaying, stopPlayback]);
+		setStreamingMarkdown("");
+		setStreamingMessageId(null);
+		tempMessageIdRef.current = null;
+	}, [stopGlobalPlayback]);
 
 	const sessionButtons = useMemo(
 		() =>
@@ -213,322 +344,152 @@ const ChatScreen = ({ jwt }) => {
 		[sessions, selectedSession, handleSessionSelect]
 	);
 
-	// Playback handlers
-
-	// Play single message
-	const handlePlayMessage = async (msgId) => {
-		const msg = messages.find((m) => m.id === msgId);
-		if (!msg) return;
-
-		// If this message is different from the currently playing one
-		if (playingMessageId !== msgId) {
-			// If we're in global playback, switch to this message and continue from here
-			if (isGlobalPlaying) {
-				// Find index of clicked message in AI messages
-				const aiMessages = messages.filter((m) => m.sender === "AI");
-				const newIdx = aiMessages.findIndex((m) => m.id === msgId);
-				if (newIdx !== -1) {
-					// Stop current playback
-					stopPlayback();
-					// Start from the new message
-					playGlobalMessage(newIdx);
-				}
-			} else {
-				// Normal single message playback
-				setIsGlobalPlaying(false);
-				globalPlaybackRef.current.active = false;
-				try {
-					// First check if we already have the audio cached
-					const hasAudio = await checkCachedAudio(msgId);
-
-					if (hasAudio) {
-						// If we have cached audio, play it directly
-						await startPlayback(msg.id, msg.text);
-					} else {
-						// First ensure we have the audio
-						const audioReady = await ensureAudioAvailable(
-							msg.id,
-							msg.text,
-							socketRef.current,
-							getJwtUserId(jwt)
-						);
-
-						if (audioReady) {
-							// Now play the cached audio
-							await startPlayback(msg.id, msg.text);
-						}
-					}
-				} catch (error) {
-					console.error("Error in message playback:", error);
-				}
-			}
-		} else {
-			// If this is the currently playing message, pause it and move to next if in global mode
-			if (isGlobalPlaying) {
-				const aiMessages = messages.filter((m) => m.sender === "AI");
-				const currentIdx = globalPlaybackRef.current.idx;
-				// Stop current playback
-				stopPlayback();
-				// Start next message if available
-				if (currentIdx + 1 < aiMessages.length) {
-					playGlobalMessage(currentIdx + 1);
-				} else {
-					// No more messages, stop global playback
-					setIsGlobalPlaying(false);
-					globalPlaybackRef.current.active = false;
-				}
-			} else {
-				// Just pause if in single message mode
-				pausePlayback();
-			}
-		}
-	};
-
-	// Pause single message
-	const handlePauseMessage = (msgId) => {
-		const socket = socketRef.current;
-		socket.emit("tts:stop", {
-			messageId: msgId,
-			userId: getJwtUserId(jwt),
-		});
-		pausePlayback();
-	};
-
-	// Global playback state
-	const globalPlaybackRef = useRef({ active: false, idx: 0, aiMessages: [] });
-
-	// Play all messages (global)
-	const handlePlayAll = () => {
-		// If already playing globally, pause
-		if (isGlobalPlaying) {
-			handleGlobalPause();
-			return;
-		}
-		setIsGlobalPlaying(true);
-		// Get all AI messages
+	// Playback handlers for global and individual message playback
+	const handleGlobalPlayback = useCallback(() => {
 		const aiMessages = messages.filter((m) => m.sender === "AI");
-		if (aiMessages.length === 0) return;
-		globalPlaybackRef.current = { active: true, idx: 0, aiMessages };
-		playGlobalMessage(0);
-	};
-
-	// Play message at index in global playback
-	const playGlobalMessage = async (idx) => {
-		const { aiMessages } = globalPlaybackRef.current;
-		if (idx >= aiMessages.length) {
-			// All done
-			setIsGlobalPlaying(false);
-			stopPlayback();
-			globalPlaybackRef.current.active = false;
+		if (aiMessages.length === 0) {
+			console.log("[Playback] No AI messages to play globally.");
 			return;
 		}
 
-		const msg = aiMessages[idx];
-		const userId = getJwtUserId(jwt);
+		if (isGlobalPlayback) {
+			console.log("[Playback] Stopping global playback.");
+			stopGlobalPlayback();
+		} else {
+			console.log("[Playback] Starting global playback from beginning.");
+			startGlobalPlayback(aiMessages, selectedSession);
+		}
+	}, [
+		messages,
+		isGlobalPlayback,
+		startGlobalPlayback,
+		stopGlobalPlayback,
+		selectedSession,
+	]);
 
-		try {
-			// First ensure we have the audio
-			const audioReady = await ensureAudioAvailable(
-				msg.id,
-				msg.text,
-				socketRef.current,
-				userId
-			);
+	const handleMessagePlayback = useCallback(
+		(messageId) => {
+			const aiMessages = messages.filter((m) => m.sender === "AI");
+			const targetMessage = aiMessages.find((m) => m.id === messageId);
 
-			if (!audioReady) {
-				console.error("Failed to ensure audio for message:", msg.id);
-				// Skip to next message
-				if (globalPlaybackRef.current.active) {
-					playGlobalMessage(idx + 1);
-				}
+			if (!targetMessage) {
+				console.warn(
+					`[Playback] Could not find message ${messageId} to play.`
+				);
 				return;
 			}
 
-			// Set the current global playback index
-			globalPlaybackRef.current.idx = idx;
-
-			// Now we know we have the audio in cache, play it
-			await startPlayback(msg.id, msg.text, {
-				onComplete: () => {
-					if (globalPlaybackRef.current.active) {
-						playGlobalMessage(idx + 1);
-					}
-				},
-				onError: () => {
-					if (globalPlaybackRef.current.active) {
-						playGlobalMessage(idx + 1);
-					}
-				},
-			});
-		} catch (error) {
-			console.error("Error in global playback:", error);
-			if (globalPlaybackRef.current.active) {
-				playGlobalMessage(idx + 1);
-			}
-		}
-	};
-
-	// Pause global playback
-	const handleGlobalPause = () => {
-		setIsGlobalPlaying(false);
-		globalPlaybackRef.current.active = false;
-		// Stop current audio
-		stopPlayback();
-	};
-
-	// Socket TTS event listeners
-	useEffect(() => {
-		const socket = socketRef.current;
-		if (!socket) return;
-
-		// Audio chunk assembly
-		socket.on("tts:audio", async (data) => {
-			// Add the chunk for the specific message
-			addAudioChunk(data.bytes, data.messageId);
-			if (data.isLast) {
-				const messageText = messages.find(
-					(m) => m.id === data.messageId
-				)?.text;
-				if (messageText) {
-					// Just cache the audio without auto-playing
-					await finalizeAudio(data.messageId, messageText, {
-						skipPlayback: true, // Don't auto-play when caching
-					});
+			if (currentMessageId === messageId) {
+				// This message is currently the active one
+				if (isPlaying && !isPaused) {
+					console.log(`[Playback] Pausing message: ${messageId}`);
+					pausePlayback();
+				} else {
+					console.log(`[Playback] Resuming message: ${messageId}`);
+					resumePlayback();
 				}
-			}
-		});
-
-		// Playback stopped
-		socket.on("tts:stopped", () => {
-			if (globalPlaybackRef.current.active && isGlobalPlaying) {
-				stopPlayback();
-				globalPlaybackRef.current.idx++;
-				playGlobalMessage(globalPlaybackRef.current.idx);
 			} else {
-				stopPlayback();
-			}
-		});
-
-		// Playback error
-		socket.on("tts:error", () => {
-			stopPlayback();
-			if (globalPlaybackRef.current.active && isGlobalPlaying) {
-				// On error during global playback, try next message
-				globalPlaybackRef.current.idx++;
-				playGlobalMessage(globalPlaybackRef.current.idx);
-			}
-		});
-
-		return () => {
-			socket.off("tts:audio");
-			socket.off("tts:stopped");
-			socket.off("tts:error");
-		};
-	}, [
-		// Remove dependencies that don't need to trigger socket reconnection
-		messages, // needed for finding message text
-		addAudioChunk, // needed for audio chunk handling
-		finalizeAudio, // needed for audio finalization
-	]);
-	// Remove the unused highlight logic since we now pass the index directly
-
-	const messageBubbles = useMemo(
-		() =>
-			messages.map((msg, idx) => {
-				const isAI = msg.sender === "AI";
-				// If global playback is active, only the current message is playing
-				const isPlaying = isGlobalPlaying
-					? globalPlaybackRef.current.active &&
-					  playingMessageId === msg.id &&
-					  !isPaused
-					: playingMessageId === msg.id && !isPaused;
-				const showPlayback = isAI;
-				// If last message is AI and streaming, use aiStreamingText
-				if (isAI && msg.streaming && idx === messages.length - 1) {
-					return (
-						<MessageBubble
-							key={msg.id}
-							message={{ ...msg, text: aiStreamingText }}
-							onPlay={() => handlePlayMessage(msg.id)}
-							onPause={() => handlePauseMessage(msg.id)}
-							isPlaying={isPlaying}
-							highlightedSentenceIdx={
-								playingMessageId === msg.id
-									? highlightedSentenceIdx
-									: null
-							}
-							showPlayback={showPlayback}
-						/>
-					);
-				}
-				return (
-					<MessageBubble
-						key={msg.id}
-						message={msg}
-						onPlay={() => handlePlayMessage(msg.id)}
-						onPause={() => handlePauseMessage(msg.id)}
-						isPlaying={isPlaying}
-						highlightedSentenceIdx={
-							playingMessageId === msg.id
-								? highlightedSentenceIdx
-								: null
-						}
-						showPlayback={showPlayback}
-					/>
+				// Start playback from this specific message
+				console.log(
+					`[Playback] Starting single playback for message: ${messageId}`
 				);
-			}),
+				playSingleMessage(
+					messageId,
+					selectedSession,
+					targetMessage.text
+				);
+			}
+		},
 		[
 			messages,
-			aiStreamingText,
-			playingMessageId,
+			currentMessageId,
+			isPlaying,
 			isPaused,
-			highlightedSentenceIdx,
-			isGlobalPlaying,
+			resumePlayback,
+			pausePlayback,
+			playSingleMessage,
+			selectedSession,
 		]
 	);
 
-	const handleSend = useCallback(async () => {
-		if (!input.trim() || !jwt) return;
-		setIsTyping(true);
-		let sessionId = selectedSession;
-		const socket = socketRef.current;
+	const messageBubbles = useMemo(() => {
+		return messages.map((msg) => {
+			const isAI = msg.sender === "AI";
+			const msgIsPlaying = currentMessageId === msg.id && isPlaying;
+			const showPlayback = isAI && !msg.streaming;
 
-		// Stop any ongoing playback before starting a new session or sending a message
-		if (playingMessageId || isGlobalPlaying) {
-			stopPlayback();
-			setIsGlobalPlaying(false);
-			globalPlaybackRef.current.active = false;
+			return (
+				<MessageBubble
+					key={msg.id}
+					message={msg}
+					onPlay={() => handleMessagePlayback(msg.id)}
+					isPlaying={msgIsPlaying}
+					highlightedSentenceIdx={
+						currentMessageId === msg.id
+							? currentSentenceIndex
+							: null
+					}
+					showPlayback={showPlayback}
+				/>
+			);
+		});
+	}, [
+		messages,
+		currentMessageId,
+		isPlaying,
+		currentSentenceIndex,
+		handleMessagePlayback,
+	]);
+
+	const handleSend = useCallback(async () => {
+		if (!input.trim() || !jwt || !socketConnected) {
+			console.warn(
+				"[Send] Aborted: No input, JWT, or socket connection."
+			);
+			return;
 		}
+
+		const socket = socketRef.current;
+		const user_id = getJwtUserId(jwt);
+
+		console.log("[Send] Stopping global playback before sending.");
+		stopGlobalPlayback();
+
+		// Clear any streaming state
+		setIsTyping(false);
+		setStreamingMarkdown("");
+		setStreamingMessageId(null);
 
 		// If starting a new chat
 		if (!selectedSession && messages.length === 0) {
+			console.log("[Send] Creating new session...");
 			try {
 				const res = await createSession(jwt, "New Chat");
 				const sessionId = res.session_id;
 				const userMessage = {
-					id: Date.now(),
+					id: `user_${Date.now()}`,
 					sender: "USER",
 					text: input,
 				};
+				console.log(`[Send] New session created: ${sessionId}`);
 
 				// Update all state in the correct order
 				await new Promise((resolve) => {
-					// First set the session ID so useEffect knows which session to load messages for
 					setSelectedSession(sessionId);
-					// Add the new session to the list
 					setSessions((prev) => [
 						...prev,
 						{ id: sessionId, title: "New Chat" },
 					]);
-					// Then update messages
 					setMessages([userMessage]);
 					setInput("");
-					// Give React a chance to update the state
 					setTimeout(resolve, 0);
 				});
 
-				// Now send the message after state is updated
-				const user_id = getJwtUserId(jwt);
+				setIsTyping(true);
+
+				console.log(
+					`[Socket] Emitting 'user:message' for new session.`
+				);
 				socket.emit("user:message", {
 					session_id: sessionId,
 					user_id,
@@ -536,33 +497,41 @@ const ChatScreen = ({ jwt }) => {
 					is_first_message: true,
 				});
 			} catch (error) {
-				console.error("Error creating session:", error);
+				console.error("[Send] Error creating session:", error);
 				setIsTyping(false);
+				toast.error("Failed to create new session");
 			}
 		} else if (selectedSession) {
-			// Send user message via socket
-			const user_id = getJwtUserId(jwt);
-			socket.emit("user:message", {
-				session_id: sessionId,
-				user_id,
+			console.log(
+				`[Send] Sending message to existing session: ${selectedSession}`
+			);
+			const userMessage = {
+				id: `user_${Date.now()}`,
+				sender: "USER",
 				text: input,
+			};
+
+			setMessages((msgs) => [...msgs, userMessage]);
+			setInput("");
+			setIsTyping(true);
+
+			console.log(
+				`[Socket] Emitting 'user:message' for existing session.`
+			);
+			socket.emit("user:message", {
+				session_id: selectedSession,
+				user_id,
+				text: userMessage.text,
 				is_first_message: messages.length === 0,
 			});
-			setMessages((msgs) => [
-				...msgs,
-				{ id: Date.now(), sender: "USER", text: input },
-			]);
-			setInput("");
 		}
 	}, [
 		input,
 		selectedSession,
 		messages.length,
 		jwt,
-		isTyping,
-		playingMessageId,
-		isGlobalPlaying,
-		stopPlayback,
+		socketConnected,
+		stopGlobalPlayback,
 	]);
 
 	useEffect(() => {
@@ -606,20 +575,18 @@ const ChatScreen = ({ jwt }) => {
 					<button
 						className={styles.logoutBtn}
 						onClick={async () => {
-							// Stop any ongoing playback first
-							if (playingMessageId || isGlobalPlaying) {
-								stopPlayback();
-								setIsGlobalPlaying(false);
-								globalPlaybackRef.current.active = false;
-							}
+							console.log("[Auth] Logging out...");
+							stopGlobalPlayback();
 
 							try {
 								await logoutUser(jwt);
-								// Redirect to login page or update app state
-								window.location.href = "/login"; // or use your routing mechanism
+								console.log("[Auth] Logout successful.");
+								window.location.href = "/login";
 							} catch (error) {
-								console.error("Error during logout:", error);
-								// Still redirect even if there's an error
+								console.error(
+									"[Auth] Error during logout:",
+									error
+								);
 								window.location.href = "/login";
 							}
 						}}
@@ -659,35 +626,39 @@ const ChatScreen = ({ jwt }) => {
 							onChange={(e) => setInput(e.target.value)}
 							placeholder="Type your message..."
 							onKeyDown={(e) => e.key === "Enter" && handleSend()}
+							disabled={!socketConnected}
 						/>
-						{/* Global speaker/pause icon, shown only if there are messages */}
-						{messages.filter((m) => m.sender === "AI").length > 0 &&
-							(isGlobalPlaying ? (
-								<i
-									className="ri-pause-fill"
-									style={{
-										marginRight: 12,
-										cursor: "pointer",
-										color: "#1565c0",
-										fontSize: "1.5em",
-									}}
-									title="Pause all messages"
-									onClick={handleGlobalPause}
-								/>
-							) : (
-								<i
-									className="ri-volume-up-fill"
-									style={{
-										marginRight: 12,
-										cursor: "pointer",
-										color: "#1565c0",
-										fontSize: "1.5em",
-									}}
-									title="Play all messages"
-									onClick={handlePlayAll}
-								/>
-							))}
-						<button onClick={handleSend}>Send</button>
+						{/* Global playback control */}
+						{messages.filter((m) => m.sender === "AI").length >
+							0 && (
+							<i
+								className={
+									isGlobalPlayback
+										? "ri-pause-circle-fill"
+										: "ri-play-circle-fill"
+								}
+								style={{
+									marginRight: 12,
+									cursor: "pointer",
+									color: isGlobalPlayback
+										? "#d32f2f"
+										: "#1565c0",
+									fontSize: "1.8em",
+								}}
+								title={
+									isGlobalPlayback
+										? "Stop global playback"
+										: "Start global playback"
+								}
+								onClick={handleGlobalPlayback}
+							/>
+						)}
+						<button
+							onClick={handleSend}
+							disabled={!socketConnected}
+						>
+							Send
+						</button>
 					</div>
 				</div>
 			</div>

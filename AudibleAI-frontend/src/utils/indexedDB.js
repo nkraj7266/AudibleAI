@@ -29,8 +29,8 @@ const initDB = () => {
 	});
 };
 
-// Store audio data
-export const storeAudio = async (messageId, audioBlob) => {
+// Store audio data and metadata
+export const storeAudio = async (messageId, cacheData) => {
 	try {
 		const db = await initDB();
 		return new Promise((resolve, reject) => {
@@ -39,8 +39,9 @@ export const storeAudio = async (messageId, audioBlob) => {
 
 			const item = {
 				messageId,
-				audio: audioBlob,
-				timestamp: Date.now(),
+				audio: cacheData.blob,
+				metadata: cacheData.metadata || {},
+				timestamp: cacheData.timestamp || Date.now(),
 			};
 
 			const request = store.put(item);
@@ -54,7 +55,7 @@ export const storeAudio = async (messageId, audioBlob) => {
 	}
 };
 
-// Retrieve audio data
+// Retrieve audio data with metadata
 export const getAudio = async (messageId) => {
 	try {
 		const db = await initDB();
@@ -64,7 +65,18 @@ export const getAudio = async (messageId) => {
 			const request = store.get(messageId);
 
 			request.onsuccess = () => {
-				resolve(request.result?.audio || null);
+				const result = request.result;
+				if (!result) {
+					resolve(null);
+					return;
+				}
+
+				// Return full cache data structure
+				resolve({
+					blob: result.audio,
+					metadata: result.metadata || {},
+					timestamp: result.timestamp,
+				});
 			};
 			request.onerror = () => reject(request.error);
 		});

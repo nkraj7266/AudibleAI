@@ -13,7 +13,7 @@ LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s [%(filename)s]: %(message)s'
 
 # App logger (all logs)
 app_logger = logging.getLogger('app_logger')
-app_logger.setLevel(logging.INFO)
+app_logger.setLevel(logging.DEBUG)
 app_handler = logging.FileHandler(APP_LOG_PATH)
 app_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 if not app_logger.hasHandlers():
