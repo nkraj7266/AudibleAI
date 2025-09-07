@@ -11,6 +11,7 @@ import ChatScreen from "./views/Chat/ChatScreen";
 import Home from "./views/Home/Home";
 import styles from "./App.module.css";
 import "./global.css";
+import { Toaster } from "react-hot-toast";
 
 const App = () => {
 	const [jwt, setJwt] = useState(localStorage.getItem("jwt"));
@@ -23,6 +24,7 @@ const App = () => {
 
 	return (
 		<div className={styles.appContainer}>
+			<Toaster position="top-center" />
 			<Router>
 				<Routes>
 					<Route path="/" element={<Home />} />
