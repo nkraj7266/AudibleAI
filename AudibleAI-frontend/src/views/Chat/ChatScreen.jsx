@@ -154,10 +154,34 @@ const ChatScreen = ({ jwt }) => {
 		};
 
 		// Handle sentence highlighting (Track 2: Plain text for coordination)
-		const handleSentenceHighlight = (data) => {
+		const handleSentenceHighlight = async (data) => {
 			// This event is for visual coordination, logging for now.
 			console.log("[Socket] Received 'ai:sentence:highlight'", data);
 			if (data.session_id !== selectedSession) return;
+
+			// Auto-start playback for new messages
+			if (data.message_id && data.sentence_index === 0) {
+				if (isGlobalPlayback) {
+					console.log(
+						`[Playback] Global playback is active, continuing with new message: ${data.message_id}`
+					);
+					stopGlobalPlayback();
+				}
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				console.log(
+					`[Playback] Playing new message: ${data.message_id}`
+				);
+				// Find message text to pass to playback
+				const message = messages.find((m) => m.id === data.message_id);
+				if (message) {
+					playSingleMessage(
+						data.message_id,
+						selectedSession,
+						message.text
+					);
+				}
+			}
+
 			// Store the plain text of the last sentence for potential use
 			lastMessageTextRef.current[data.message_id] = data.plain_text;
 		};
@@ -199,14 +223,6 @@ const ChatScreen = ({ jwt }) => {
 			setIsTyping(false);
 			setStreamingMarkdown("");
 			setStreamingMessageId(data.message_id);
-
-			// Auto-start playback for new messages if global playback is on
-			if (data.message_id && isGlobalPlayback) {
-				console.log(
-					`[Playback] Global playback is active, continuing with new message: ${data.message_id}`
-				);
-				// The playNextMessageInGlobalQueue will handle playing this message
-			}
 		};
 
 		// Handle session title updates
